@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Coinbase · Risk Monitor{% endblock %}
+{% block nav %}
+<a href="/main">Positions</a>
+<a href="/connect">Schwab</a>
+<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
+{% endblock %}
+{% block content %}
+<h2>Connect Coinbase</h2>
+
+{% if connected %}
+  <p>Coinbase is connected with key <code>{{ key_name }}</code>.</p>
+  <form method="post" action="/coinbase/disconnect" style="display:inline">
+    <button type="submit">Disconnect Coinbase</button>
+  </form>
+  <p class="hint" style="margin-top:16px">To rotate to a new key, paste the new credentials below and submit.</p>
+{% endif %}
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<p>Create an API key at <a href="https://portal.cdp.coinbase.com/access/api" target="_blank">portal.cdp.coinbase.com/access/api</a>. Grant <strong>View</strong> permission — no trade permission needed. Coinbase will give you a JSON file containing <code>name</code> and <code>privateKey</code>. Paste the entire JSON below.</p>
+
+<form method="post" action="/coinbase">
+  <fieldset>
+    <legend>Paste Coinbase API key JSON</legend>
+    <p class="hint">Both fields will be encrypted with your master password.</p>
+    <label>Credentials JSON
+      <textarea name="creds_json" rows="10" placeholder='{"name": "organizations/.../apiKeys/...", "privateKey": "-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n"}'></textarea>
+    </label>
+    <p class="hint">Or enter the two fields separately:</p>
+    <label>Key name<input type="text" name="key_name" placeholder="organizations/{org_id}/apiKeys/{key_id}"></label>
+    <label>Private key (PEM)
+      <textarea name="private_key" rows="6" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;...&#10;-----END EC PRIVATE KEY-----"></textarea>
+    </label>
+  </fieldset>
+  <button type="submit">Save Coinbase key</button>
+</form>
+{% endblock %}

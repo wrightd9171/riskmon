@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}BTC Exposure · Risk Monitor{% endblock %}
+{% block nav %}
+<a href="/main">Positions</a>
+<a href="/loans">Loans</a>
+<a href="/connect">Schwab</a>
+<a href="/coinbase">Coinbase</a>
+<a href="/strike">Strike</a>
+<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
+{% endblock %}
+{% block content %}
+<h2>Virtual BTC exposure</h2>
+
+<p>
+  Reference BTC price:
+  {% if btc_price %}<strong>${{ btc_price | price }}</strong>{% else %}<span class="hint">unknown — sync Coinbase or Strike first</span>{% endif %}
+  &nbsp;·&nbsp;
+  <a href="{{ toggle_all_url }}" class="link">{{ "Exclude non-BTC positions" if include_all else "Include all other positions" }}</a>
+</p>
+
+<table class="positions">
+  <thead>
+    <tr>
+      <th>Source</th>
+      <th>Symbol</th>
+      <th class="num">Native qty</th>
+      <th class="num">Virtual BTC</th>
+      <th class="num">Market Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if categories %}
+    <tr class="total">
+      <td colspan="3"><strong>Total virtual BTC exposure</strong></td>
+      <td class="num"><strong>{{ total_btc | qty_btc }}</strong></td>
+      <td class="num"><strong>{{ total_mv | num(0) }}</strong></td>
+    </tr>
+    {% endif %}
+    {% for cat in categories %}
+      <tr class="agg">
+        <td colspan="3"><strong>{{ cat.name }}</strong></td>
+        <td class="num"><strong>{{ cat.subtotal_btc | qty_btc }}</strong></td>
+        <td class="num"><strong>{{ cat.subtotal_mv | num(0) }}</strong></td>
+      </tr>
+      {% for item in cat.rows %}
+      <tr class="acct">
+        <td class="indent">{{ item.label }}</td>
+        <td>{{ item.raw_symbol }}</td>
+        <td class="num">{% if item.raw_qty is not none %}{{ item.raw_qty | qty }}{% endif %}</td>
+        <td class="num">{{ item.virtual_btc | qty_btc }}</td>
+        <td class="num">{{ item.market_value | num(0) }}</td>
+      </tr>
+      {% endfor %}
+    {% else %}
+      <tr><td colspan="5" class="empty">No BTC exposure detected. Refresh positions on the <a href="/main">Positions</a> page.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p class="hint">Direct BTC = native holding. IBIT ETF and long IBIT options are converted to virtual BTC by dividing market value by the current BTC price. Short options are excluded. Strike Loan Equity = total loan collateral − (total debt ÷ BTC price).</p>
+{% endblock %}

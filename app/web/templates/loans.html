@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Bitcoin Loans · Risk Monitor{% endblock %}
+{% block nav %}
+<a href="/main">Positions</a>
+<a href="/crypto">Crypto</a>
+<a href="/connect">Schwab</a>
+<a href="/coinbase">Coinbase</a>
+<a href="/strike">Strike</a>
+<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
+{% endblock %}
+{% block content %}
+<h2>Bitcoin-backed loans</h2>
+
+<p>
+  Reference BTC price: {% if btc_price %}<strong>${{ btc_price | price }}</strong>{% else %}<span class="hint">unknown (sync Coinbase or Strike first)</span>{% endif %}
+  &nbsp;·&nbsp;
+  <a href="/loans/new">Add loan</a>
+</p>
+
+<table class="positions">
+  <thead>
+    <tr>
+      <th>Originated</th>
+      <th>Terminates</th>
+      <th class="num">Principal</th>
+      <th class="num">Interest</th>
+      <th class="num">Debt (BTC)</th>
+      <th class="num">Collateral (BTC)</th>
+      <th class="num">Net (BTC)</th>
+      <th class="num">Collateral Value</th>
+      <th class="num">Net Value</th>
+      <th class="num">LTV</th>
+      <th>Notes</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for l in loans %}
+      <tr>
+        <td>{{ l.origination_date.strftime("%Y-%m-%d") }}</td>
+        <td>{{ l.termination_date.strftime("%Y-%m-%d") }}</td>
+        <td class="num">{{ l.principal | num(2) }}</td>
+        <td class="num">{{ l.interest | num(2) }}</td>
+        <td class="num">{{ l.debt_btc | btc }}</td>
+        <td class="num">{{ l.collateral | btc }}</td>
+        <td class="num">{{ l.net_btc | btc }}</td>
+        <td class="num">{{ l.collateral_value | num(0) }}</td>
+        <td class="num">{{ l.net_mv | num(0) }}</td>
+        <td class="num">{% if l.ltv is not none %}{{ (l.ltv * 100) | num(2) }}%{% else %}—{% endif %}</td>
+        <td>{{ l.notes or "" }}</td>
+        <td>
+          <a href="/loans/{{ l.id }}/edit">edit</a>
+          <form method="post" action="/loans/{{ l.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this loan?');">
+            <button type="submit" class="link">delete</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="12" class="empty">No loans yet. <a href="/loans/new">Add one</a>.</td></tr>
+    {% endfor %}
+    {% if loans %}
+    <tr class="agg">
+      <td colspan="2"><strong>Aggregate</strong></td>
+      <td class="num">{{ agg.principal | num(2) }}</td>
+      <td class="num">{{ agg.interest | num(2) }}</td>
+      <td class="num">{{ agg.debt_btc | btc }}</td>
+      <td class="num">{{ agg.collateral | btc }}</td>
+      <td class="num">{{ agg.net_btc | btc }}</td>
+      <td class="num">{{ agg.collateral_value | num(0) }}</td>
+      <td class="num">{{ agg.net_mv | num(0) }}</td>
+      <td class="num">{% if agg.ltv is not none %}{{ (agg.ltv * 100) | num(2) }}%{% else %}—{% endif %}</td>
+      <td colspan="2"></td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+
+<p class="hint">Debt (BTC) = (principal + interest) ÷ current BTC price — the amount of collateral you'd forfeit if the loan settled today. Aggregate LTV = total debt ÷ (total collateral × current BTC price).</p>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Strike · Risk Monitor{% endblock %}
+{% block nav %}
+<a href="/main">Positions</a>
+<a href="/loans">Loans</a>
+<a href="/connect">Schwab</a>
+<a href="/coinbase">Coinbase</a>
+<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
+{% endblock %}
+{% block content %}
+<h2>Connect Strike</h2>
+
+{% if connected %}
+  <p>Strike is connected.</p>
+  <form method="post" action="/strike/disconnect" style="display:inline">
+    <button type="submit">Disconnect Strike</button>
+  </form>
+  <p class="hint" style="margin-top:16px">To rotate the API key, enter a new one below.</p>
+{% endif %}
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<p>Create an API key at <a href="https://dashboard.strike.me/settings/api" target="_blank">dashboard.strike.me/settings/api</a>. Grant <strong>read</strong> permissions for balances and rates. Strike doesn't expose loan data via API — bitcoin-backed loans are entered manually on the <a href="/loans">Loans</a> page.</p>
+
+<form method="post" action="/strike">
+  <fieldset>
+    <legend>Strike API key</legend>
+    <label>API key
+      <input type="password" name="api_key" placeholder="strike_..." required>
+    </label>
+  </fieldset>
+  <button type="submit">Save Strike key</button>
+</form>
+{% endblock %}

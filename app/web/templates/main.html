@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Positions · Risk Monitor{% endblock %}
+{% block nav %}
+<form method="post" action="/refresh"><button type="submit">Refresh</button></form>
+<a href="/crypto">Crypto</a>
+<a href="/loans">Loans</a>
+<a href="/connect">Schwab</a>
+<a href="/coinbase">Coinbase</a>
+<a href="/strike">Strike</a>
+<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
+{% endblock %}
+{% block content %}
+
+<section class="filter">
+  <form method="get" action="/main">
+    <input type="hidden" name="sort" value="{{ sort_by }}">
+    <input type="hidden" name="dir" value="{{ sort_dir }}">
+    {% if include_zero %}<input type="hidden" name="include_zero" value="1">{% endif %}
+    {% if hide_no_pnl %}<input type="hidden" name="hide_no_pnl" value="1">{% endif %}
+    <fieldset>
+      <legend>Filter by account</legend>
+      {% if accounts %}
+        {% for a in accounts %}
+          <label class="inline">
+            <input type="checkbox" name="acct" value="{{ a.id }}" {% if a.id in selected_ids %}checked{% endif %}>
+            {{ a.label }}
+            {% if a.synced %}<span class="hint">(synced {{ a.synced.strftime("%Y-%m-%d %H:%M") }} UTC)</span>{% endif %}
+          </label>
+        {% endfor %}
+        <div class="filter-actions">
+          <button type="submit">Apply filter</button>
+          <a href="/main" class="link">Clear</a>
+          <span class="hint">&nbsp;·&nbsp;</span>
+          <a href="{{ toggle_zero_url }}" class="link">{{ "Hide zero-value positions" if include_zero else "Include zero-value positions" }}</a>
+          <span class="hint">&nbsp;·&nbsp;</span>
+          <a href="{{ toggle_pnl_url }}" class="link">{{ "Show positions without P&L" if hide_no_pnl else "Hide positions without P&L" }}</a>
+        </div>
+      {% else %}
+        <p class="hint">No accounts yet. Click <strong>Refresh</strong> to pull positions.</p>
+      {% endif %}
+    </fieldset>
+  </form>
+</section>
+
+{% macro sort_arrow(col) -%}
+  {%- if sort_by == col -%}
+    <span class="sort-arrow">{{ "↑" if sort_dir == "asc" else "↓" }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro pnl_cell(val) -%}
+<td class="num{% if val is not none and val > 0 %} pnl-pos{% elif val is not none and val < 0 %} pnl-neg{% endif %}">{{ val | num(0) }}</td>
+{%- endmacro %}
+
+<table class="positions">
+  <thead>
+    <tr>
+      <th><a href="{{ sort_link('symbol') }}">Symbol / Account</a>{{ sort_arrow('symbol') }}</th>
+      <th><a href="{{ sort_link('description') }}">Description</a>{{ sort_arrow('description') }}</th>
+      <th class="num"><a href="{{ sort_link('last_price') }}">Last Price</a>{{ sort_arrow('last_price') }}</th>
+      <th class="num"><a href="{{ sort_link('quantity') }}">Quantity</a>{{ sort_arrow('quantity') }}</th>
+      <th class="num"><a href="{{ sort_link('market_value') }}">Market Value</a>{{ sort_arrow('market_value') }}</th>
+      <th class="num"><a href="{{ sort_link('cost_basis_price') }}">Cost Basis Price</a>{{ sort_arrow('cost_basis_price') }}</th>
+      <th class="num"><a href="{{ sort_link('cost_basis_value') }}">Cost Basis Value</a>{{ sort_arrow('cost_basis_value') }}</th>
+      <th class="num"><a href="{{ sort_link('unrealized_pnl') }}">Unrealized P&amp;L</a>{{ sort_arrow('unrealized_pnl') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% if symbols %}
+    <tr class="total">
+      <td colspan="4"><strong>Total</strong></td>
+      <td class="num"><strong>{{ total_market_value | num(0) }}</strong></td>
+      <td></td>
+      <td class="num"><strong>{{ total_cost_basis_value | num(0) }}</strong></td>
+      <td class="num{% if total_unrealized_pnl is not none and total_unrealized_pnl > 0 %} pnl-pos{% elif total_unrealized_pnl is not none and total_unrealized_pnl < 0 %} pnl-neg{% endif %}"><strong>{{ total_unrealized_pnl | num(0) }}</strong></td>
+    </tr>
+  {% endif %}
+  {% for s in symbols %}
+    {% set is_btc = s.symbol == 'BTC' %}
+    <tr class="agg">
+      <td><strong>{{ s.symbol }}</strong></td>
+      <td>{{ s.description }}</td>
+      <td class="num">{{ s.last_price | price }}</td>
+      <td class="num">{{ (s.quantity | qty_btc) if is_btc else (s.quantity | qty) }}</td>
+      <td class="num">{{ s.market_value | num(0) }}</td>
+      <td class="num">{{ s.cost_basis_price | price }}</td>
+      <td class="num">{{ s.cost_basis_value | num(0) }}</td>
+      {{ pnl_cell(s.unrealized_pnl) }}
+    </tr>
+    {% for p in s.per_account %}
+      <tr class="acct">
+        <td class="indent">{{ p.account_label }}</td>
+        <td></td>
+        <td class="num">{{ p.last_price | price }}</td>
+        <td class="num">{{ (p.quantity | qty_btc) if is_btc else (p.quantity | qty) }}</td>
+        <td class="num">{{ p.market_value | num(0) }}</td>
+        <td class="num">{{ p.cost_basis_price | price }}</td>
+        <td class="num">{{ p.cost_basis_value | num(0) }}</td>
+        {{ pnl_cell(p.unrealized_pnl) }}
+      </tr>
+    {% endfor %}
+  {% else %}
+    <tr><td colspan="8" class="empty">No positions to show. Try <strong>Refresh</strong>{% if not include_zero %} or <a href="{{ toggle_zero_url }}">include zero-value positions</a>{% endif %}.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<p class="hint">Tax-lot detail with lot open dates is not exposed by Schwab's Trader API. Position-level weighted-average cost basis is shown. Coinbase/Strike positions omit cost basis (transfers make it unreliable).</p>
+
+{% endblock %}

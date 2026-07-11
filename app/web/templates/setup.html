@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Set up · Risk Monitor{% endblock %}
+{% block content %}
+<h2>First-run setup</h2>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/setup">
+  <fieldset>
+    <legend>Master password</legend>
+    <p class="hint">Encrypts all stored credentials at rest. There is no recovery — save it somewhere safe.</p>
+    <label>Password<input type="password" name="password" required minlength="8"></label>
+    <label>Confirm<input type="password" name="confirm" required minlength="8"></label>
+  </fieldset>
+  <fieldset>
+    <legend>Schwab API credentials</legend>
+    <p class="hint">From your registered app at developer.schwab.com. Callback URL on the app must be <code>https://127.0.0.1:8182/</code>.</p>
+    <label>Client ID<input type="text" name="client_id" required></label>
+    <label>Client Secret<input type="password" name="client_secret" required></label>
+  </fieldset>
+  <button type="submit">Save and continue</button>
+</form>
+{% endblock %}
