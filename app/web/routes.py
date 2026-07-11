@@ -15,6 +15,7 @@ from sqlalchemy import select
 from ..coinbase.client import CoinbaseAuthError
 from ..coinbase.sync import sync_all as coinbase_sync_all
 from ..db import Account, BitcoinLoan, Position, SessionLocal, init_db
+from .. import scheduler as digest_scheduler
 from ..db import ChainAddress
 from ..fidelity import sync as fidelity_sync
 from ..onchain import sync as onchain_sync
@@ -602,6 +603,79 @@ def strike_disconnect():
         return RedirectResponse("/unlock", status_code=303)
     store.update(strike_api_key=None)
     return RedirectResponse("/strike", status_code=303)
+
+
+DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+@router.get("/notify", response_class=HTMLResponse)
+def notify_get(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    last_sent = store.get("notify_last_sent") or ""
+    return TEMPLATES.TemplateResponse(request, "notify.html", {
+        "enabled": bool(store.get("notify_enabled")),
+        "smtp_host": store.get("notify_smtp_host") or "smtp.mail.yahoo.com",
+        "smtp_port": store.get("notify_smtp_port") or 465,
+        "smtp_user": store.get("notify_smtp_user") or "",
+        "smtp_password_set": bool(store.get("notify_smtp_password")),
+        "email_from": store.get("notify_email_from") or "",
+        "email_to": store.get("notify_email_to") or "",
+        "dow": int(store.get("notify_dow", 6)),
+        "hour": int(store.get("notify_hour", 8)),
+        "minute": int(store.get("notify_minute", 0)),
+        "days_of_week": list(enumerate(DAYS_OF_WEEK)),
+        "last_sent": last_sent,
+        "message": None,
+        "error": None,
+    })
+
+
+@router.post("/notify")
+def notify_post(
+    request: Request,
+    enabled: str = Form(""),
+    smtp_host: str = Form(...),
+    smtp_port: int = Form(465),
+    smtp_user: str = Form(...),
+    smtp_password: str = Form(""),
+    email_from: str = Form(""),
+    email_to: str = Form(...),
+    dow: int = Form(6),
+    hour: int = Form(8),
+    minute: int = Form(0),
+):
+    gate = _gate(request)
+    if gate:
+        return gate
+    updates = {
+        "notify_enabled": bool(enabled),
+        "notify_smtp_host": smtp_host.strip(),
+        "notify_smtp_port": int(smtp_port),
+        "notify_smtp_user": smtp_user.strip(),
+        "notify_email_from": email_from.strip(),
+        "notify_email_to": email_to.strip(),
+        "notify_dow": int(dow),
+        "notify_hour": int(hour),
+        "notify_minute": int(minute),
+    }
+    if smtp_password.strip():
+        updates["notify_smtp_password"] = smtp_password
+    store.update(**updates)
+    return RedirectResponse("/notify", status_code=303)
+
+
+@router.post("/notify/test")
+def notify_test(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    try:
+        digest_scheduler.send_digest_now()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Send failed: {exc}")
+    return RedirectResponse("/notify", status_code=303)
 
 
 @router.get("/onchain", response_class=HTMLResponse)
