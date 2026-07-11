@@ -271,9 +271,12 @@ def main_view(
             "per_account": [],
         })
         for pos, acct_row in rows:
-            a = agg[pos.symbol]
-            a["symbol"] = pos.symbol
-            if pos.description:
+            key = "CASH" if _is_cash(pos.symbol) else pos.symbol
+            a = agg[key]
+            a["symbol"] = key
+            if key == "CASH":
+                a["description"] = "Cash and money markets"
+            elif pos.description:
                 a["description"] = pos.description
             a["quantity"] += pos.quantity or 0
             a["market_value"] += pos.market_value or 0
@@ -589,6 +592,14 @@ def strike_disconnect():
 
 
 IBIT_OPTION_PATTERN = re.compile(r"^IBIT\d")
+
+CASH_SYMBOLS = frozenset({"USD", "SPAXX", "FDRXX", "VMRXX"})
+
+
+def _is_cash(symbol: str) -> bool:
+    if not symbol:
+        return False
+    return symbol.rstrip("*") in CASH_SYMBOLS
 
 
 def _category(name: str, rows: list[dict]) -> dict:
