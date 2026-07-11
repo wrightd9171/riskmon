@@ -15,7 +15,9 @@ from sqlalchemy import select
 from ..coinbase.client import CoinbaseAuthError
 from ..coinbase.sync import sync_all as coinbase_sync_all
 from ..db import Account, BitcoinLoan, Position, SessionLocal, init_db
+from ..db import ChainAddress
 from ..fidelity import sync as fidelity_sync
+from ..onchain import sync as onchain_sync
 from ..schwab import oauth as schwab_oauth
 from ..schwab.client import TokenError
 from ..schwab.sync import sync_all as schwab_sync_all
@@ -84,6 +86,8 @@ def _account_label(account: Account) -> str:
         return "Strike"
     if account.broker == "fidelity":
         return f"Fidelity {account.account_type}" if account.account_type else "Fidelity"
+    if account.broker == "onchain":
+        return account.account_type or "On-chain"
     parts = ["Schwab"]
     if account.account_type:
         parts.append(account.account_type.title().replace("_", " "))
@@ -98,6 +102,7 @@ def _any_broker_configured() -> bool:
         or store.get("coinbase_key_name")
         or store.get("strike_api_key")
         or fidelity_sync.has_csv()
+        or onchain_sync.has_addresses()
     )
 
 
@@ -470,6 +475,14 @@ def refresh_post():
         except Exception as exc:
             errors.append(f"Fidelity CSV import failed: {exc}")
 
+    if onchain_sync.has_addresses():
+        try:
+            result = onchain_sync.sync_all()
+            for e in result.get("errors") or []:
+                errors.append(f"On-chain: {e}")
+        except Exception as exc:
+            errors.append(f"On-chain sync failed: {exc}")
+
     if not _any_broker_configured():
         return RedirectResponse("/connect", status_code=303)
 
@@ -589,6 +602,65 @@ def strike_disconnect():
         return RedirectResponse("/unlock", status_code=303)
     store.update(strike_api_key=None)
     return RedirectResponse("/strike", status_code=303)
+
+
+@router.get("/onchain", response_class=HTMLResponse)
+def onchain_get(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    with SessionLocal() as session:
+        addrs = session.execute(
+            select(ChainAddress).order_by(ChainAddress.chain, ChainAddress.id)
+        ).scalars().all()
+        return TEMPLATES.TemplateResponse(request, "onchain.html", {
+            "addresses": [
+                {"id": a.id, "chain": a.chain, "address": a.address, "label": a.label or ""}
+                for a in addrs
+            ],
+            "error": None,
+        })
+
+
+@router.post("/onchain")
+def onchain_post(
+    request: Request,
+    chain: str = Form("BTC"),
+    address: str = Form(...),
+    label: str = Form(""),
+):
+    gate = _gate(request)
+    if gate:
+        return gate
+    chain = chain.strip().upper() or "BTC"
+    address = address.strip()
+    label = label.strip() or None
+    if not address:
+        return RedirectResponse("/onchain", status_code=303)
+    with SessionLocal() as session:
+        existing = session.scalar(
+            select(ChainAddress).where(ChainAddress.address == address)
+        )
+        if existing:
+            existing.chain = chain
+            existing.label = label
+        else:
+            session.add(ChainAddress(chain=chain, address=address, label=label))
+        session.commit()
+    return RedirectResponse("/onchain", status_code=303)
+
+
+@router.post("/onchain/{addr_id}/delete")
+def onchain_delete(request: Request, addr_id: int):
+    gate = _gate(request)
+    if gate:
+        return gate
+    with SessionLocal() as session:
+        addr = session.get(ChainAddress, addr_id)
+        if addr is not None:
+            session.delete(addr)
+            session.commit()
+    return RedirectResponse("/onchain", status_code=303)
 
 
 IBIT_OPTION_PATTERN = re.compile(r"^IBIT\d")

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}On-chain · Risk Monitor{% endblock %}
+{% block nav %}
+<a href="/main">Positions</a>
+<a href="/crypto">Crypto</a>
+<a href="/loans">Loans</a>
+<a href="/connect">Schwab</a>
+<a href="/coinbase">Coinbase</a>
+<a href="/strike">Strike</a>
+<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
+{% endblock %}
+{% block content %}
+<h2>On-chain (self-custody) addresses</h2>
+
+<p>Add public receive addresses to include their balances in the portfolio view. Balances are queried at <a href="https://mempool.space" target="_blank">mempool.space</a> — no API key needed. Private keys are never involved: watch-only.</p>
+
+<p><strong>Supported chains:</strong> BTC only right now. Ethereum and others can be added later.</p>
+
+<table class="positions">
+  <thead>
+    <tr>
+      <th>Chain</th>
+      <th>Address</th>
+      <th>Label</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in addresses %}
+      <tr>
+        <td>{{ a.chain }}</td>
+        <td><code>{{ a.address }}</code></td>
+        <td>{{ a.label }}</td>
+        <td>
+          <form method="post" action="/onchain/{{ a.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this address?');">
+            <button type="submit" class="link">remove</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="empty">No addresses yet. Add one below.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 style="margin-top:24px">Add a new address</h3>
+<form method="post" action="/onchain">
+  <fieldset>
+    <label>Chain
+      <input type="text" name="chain" value="BTC" required>
+    </label>
+    <label>Public address
+      <input type="text" name="address" required placeholder="bc1... or 1... or 3...">
+    </label>
+    <label>Label (optional)
+      <input type="text" name="label" placeholder="Hardware wallet, cold storage, etc.">
+    </label>
+  </fieldset>
+  <button type="submit">Save address</button>
+</form>
+
+<p class="hint">Balances update on the next Refresh. All addresses for the same chain aggregate into a single "On-chain BTC" account row on the positions and crypto views.</p>
+{% endblock %}

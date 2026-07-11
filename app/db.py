@@ -51,6 +51,14 @@ class Position(Base):
     account = relationship("Account", back_populates="positions")
 
 
+class ChainAddress(Base):
+    __tablename__ = "chain_addresses"
+    id = Column(Integer, primary_key=True)
+    chain = Column(String, nullable=False)
+    address = Column(String, nullable=False, unique=True)
+    label = Column(String)
+
+
 class BitcoinLoan(Base):
     __tablename__ = "bitcoin_loans"
     id = Column(Integer, primary_key=True)

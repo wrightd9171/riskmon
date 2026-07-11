@@ -29,38 +29,92 @@ Three views, one server, one master password.
 ## Data sources
 
 ### Schwab (OAuth)
-1. Register a developer app at [developer.schwab.com](https://developer.schwab.com)
-2. Set the app's **Callback URL** to exactly `https://127.0.0.1:8182` (no trailing slash — Schwab requires an exact string match; the wrong slash is a common cause of "returned to login screen" symptoms)
-3. Wait for Schwab approval, then copy the `client_id` and `client_secret` into the Risk Monitor setup form
-4. On `/connect`, click **Authorize with Schwab** — a browser window opens Schwab login, you complete 2FA and approve access, Schwab redirects to `https://127.0.0.1:8182?code=...`
-5. First browser hit to the callback URL shows a self-signed certificate warning — see **Trust the local cert** below to eliminate it going forward
-6. Access tokens auto-refresh every ~30 min; the refresh token itself expires every ~7 days → hit **Reconnect** in the nav to redo the browser flow
+
+**Get a developer account and register an app** (~3-7 business days for approval):
+
+1. Sign up at [developer.schwab.com](https://developer.schwab.com) with the same email tied to your Schwab brokerage account (they cross-check)
+2. Log in, then go to **Dashboard** → **My Apps** → **Add a New App**
+3. Fill out the app registration form:
+   - **App Name**: any label (e.g., "Personal Risk Monitor")
+   - **API Product**: select **Accounts and Trading Production**
+   - **Callback URL**: enter exactly `https://127.0.0.1:8182` — **no trailing slash**. Schwab requires an exact byte-for-byte match; the wrong slash is the #1 cause of "you got redirected back to the Schwab login page after 2FA" symptoms
+   - Description: whatever
+4. Submit and wait. Schwab reviews manually. You'll get an email when the app moves from **Pending** to **Ready For Use**
+5. Once approved, open the app in the dashboard and copy **App Key** (this is your `client_id`) and **App Secret** (this is your `client_secret`)
+
+**Wire it into Risk Monitor:**
+
+6. On the Risk Monitor setup page, paste the `client_id` and `client_secret`
+7. On `/connect`, click **Authorize with Schwab** — a browser opens the Schwab login. Enter your Schwab creds + 2FA + approve. Schwab redirects to `https://127.0.0.1:8182?code=...`
+8. First time only: your browser shows a self-signed cert warning on the callback URL — see **Trust the local cert** below to eliminate it going forward
+9. Access tokens auto-refresh every ~30 min silently. The refresh token itself expires every ~7 days — when it does, click **Reconnect** in the nav to redo the browser OAuth flow
 
 ### Coinbase (CDP API key)
-1. Create a key at [portal.cdp.coinbase.com/access/api](https://portal.cdp.coinbase.com/access/api)
-2. Grant **View** permission only (no trade permission needed for a read-only portfolio viewer)
-3. Coinbase gives you a JSON file containing `name` and `privateKey`
-4. Paste the entire JSON blob at `/coinbase` → **Save Coinbase key**
-5. The app handles both older PEM-wrapped EC keys (ES256) and newer raw base64-encoded Ed25519 keys (EdDSA), auto-detecting which JWT signing algorithm to use
+
+**Create a Trading API key on the Coinbase Developer Platform:**
+
+1. Sign in to [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com) with your Coinbase account credentials
+2. In the left nav, go to **Access** → **API keys** (direct link: [portal.cdp.coinbase.com/access/api](https://portal.cdp.coinbase.com/access/api))
+3. Click **Create API key**
+4. Configure the key:
+   - **Name**: any label (e.g., "Risk Monitor")
+   - **Portfolio**: select **Default** (or a specific portfolio if you use them)
+   - **Permissions**: check **View** only. Do NOT grant Trade or Transfer — this app only reads balances
+   - **IP allowlist**: leave blank (unless you have a static IP; local dev doesn't need it)
+   - **Signature algorithm**: leave default (Ed25519 for newer keys)
+5. Click **Create & download**. A JSON file downloads containing `name` and `privateKey`. **Coinbase shows the private key only once** — save the file
+6. On the Risk Monitor `/coinbase` page, paste the **entire JSON** into the "Credentials JSON" textarea and click **Save Coinbase key**
+
+The app auto-detects both older PEM-wrapped EC keys (signed as ES256) and newer raw base64-encoded Ed25519 keys (EdDSA), so either format from Coinbase works.
 
 ### Strike (API key)
-1. Create a key at [dashboard.strike.me/settings/api](https://dashboard.strike.me/settings/api)
-2. Grant read permissions (balances + rates)
-3. Paste at `/strike` → **Save Strike key**
-4. Balances sync via `/v1/balances`; reference BTC/USD price via `/v1/rates/ticker`
-5. Loans are **not** exposed by the API — enter them by hand on `/loans`
+
+**Create a read-only API key:**
+
+1. Sign in at [strike.me](https://strike.me/) and go to **Dashboard** → **Settings** → **API** (direct link: [dashboard.strike.me/settings/api](https://dashboard.strike.me/settings/api))
+2. Click **Create API key** (or **Generate new key**)
+3. Configure:
+   - **Name**: any label
+   - **Scopes/Permissions**: enable at least `balances.read` (and `rates.read` if listed separately). Do NOT grant payment/transfer scopes
+4. Click **Create**. Strike shows the key **once** — copy it immediately
+5. On the Risk Monitor `/strike` page, paste the key and click **Save Strike key**
+
+Loans are **not** exposed by the Strike API — enter them by hand on `/loans`.
 
 ### Fidelity (CSV import)
+
 Fidelity has no public API — the app reads a downloaded positions CSV.
 
-1. Log in at fidelity.com → **Accounts & Trade** → **Portfolio** → **Positions** → **Download** (upper right)
-2. Choose "Positions from selected accounts" if you want a subset; otherwise all accounts export
-3. Save the CSV into `data/` under this project (any filename starting with `Fidelity_` — e.g., `Fidelity_Jul-11-2026.csv`)
-4. Click **Refresh** on `/main` — the app picks up the newest matching file, wipes prior Fidelity data, and re-imports
-5. Quirks handled automatically:
-   - Option symbols with leading ` -` prefix (Fidelity export convention) are normalized (`-IBIT270115C115` → `IBIT270115C115`)
-   - `BROKERAGELINK` aggregate row in a 401K account is skipped so it doesn't double-count the linked BrokerageLink sub-account
-   - Money-market rows (SPAXX**, FDRXX**, VMRXX) become `quantity = dollar amount, last price = $1`
+1. Sign in at [fidelity.com](https://fidelity.com)
+2. Go to **Accounts & Trade** → **Portfolio**
+3. Click the **Positions** tab
+4. In the upper right of the positions table, click the **Download** icon (⬇). Choose **CSV**
+5. Save the file into the project's `data/` folder — filename must start with `Fidelity_` (e.g., `Fidelity_Jul-11-2026.csv`). This is where the CSV importer looks
+6. Click **Refresh** on `/main` — the app picks up the newest matching file, wipes prior Fidelity data, and re-imports
+
+Repeat whenever you want fresh Fidelity data (weekly, monthly — whatever cadence). The CSV always includes all four sub-accounts (Traditional IRA, 401K, BrokerageLink, HSA) if you're logged into a household view.
+
+Quirks handled automatically:
+- Option symbols with leading ` -` prefix (Fidelity export convention) are normalized (`-IBIT270115C115` → `IBIT270115C115`)
+- `BROKERAGELINK` aggregate row in a 401K account is skipped so it doesn't double-count the linked BrokerageLink sub-account (which has its own line items)
+- Money-market rows (SPAXX\*\*, FDRXX\*\*, VMRXX) become `quantity = dollar amount, last price = $1`
+
+### On-chain / self-custody (BTC)
+
+**No API key required** — balances come from public block-explorer data at [mempool.space](https://mempool.space).
+
+1. Go to the `/onchain` page in the app
+2. Under **Add a new address**, enter:
+   - **Chain**: `BTC` (only BTC is supported today; ETH and others are structured to plug in later)
+   - **Public address**: your receive address in any format — bech32 (`bc1...`), P2SH (`3...`), or legacy (`1...`)
+   - **Label** (optional): a description like "Cold storage" or "Hardware wallet"
+3. Click **Save address**
+4. Repeat for as many addresses as you want — a single hardware wallet can have many (one per receive)
+5. Click **Refresh** on `/main` — the app sums balances across all addresses per chain and inserts a single **On-chain BTC** position
+
+Private keys are never touched. This is watch-only. Balances are confirmed on-chain only (mempool sits are excluded); pricing comes from mempool.space's public price feed.
+
+If you use an xpub/zpub to derive many addresses, add each derived address individually or ask for xpub-derivation support (BIP32/BIP84) as a follow-up.
 
 ## Setup
 
