@@ -14,10 +14,10 @@ _thread: threading.Thread | None = None
 _stop = threading.Event()
 
 
-def _config_from_store() -> dict | None:
+def _config_from_store(require_enabled: bool = True) -> dict | None:
     if not store.is_unlocked():
         return None
-    if not store.get("notify_enabled"):
+    if require_enabled and not store.get("notify_enabled"):
         return None
     cfg = {
         "smtp_host": store.get("notify_smtp_host") or "",
@@ -30,6 +30,22 @@ def _config_from_store() -> dict | None:
     if not email_configured(cfg):
         return None
     return cfg
+
+
+def _missing_fields() -> list[str]:
+    if not store.is_unlocked():
+        return ["(store locked)"]
+    missing = []
+    for k, label in [
+        ("notify_smtp_host", "SMTP host"),
+        ("notify_smtp_port", "SMTP port"),
+        ("notify_smtp_user", "SMTP user"),
+        ("notify_smtp_password", "App password"),
+        ("notify_email_to", "Send to"),
+    ]:
+        if not store.get(k):
+            missing.append(label)
+    return missing
 
 
 def _is_scheduled_now(now: dt.datetime) -> bool:
@@ -57,9 +73,11 @@ def _sent_recently() -> bool:
 
 def send_digest_now() -> None:
     """Build the digest and send it. Callers should ensure the store is unlocked."""
-    cfg = _config_from_store()
+    cfg = _config_from_store(require_enabled=False)
     if cfg is None:
-        raise RuntimeError("Email is not configured or notifications are disabled.")
+        missing = _missing_fields()
+        detail = ", ".join(missing) if missing else "unknown"
+        raise RuntimeError(f"Email is not fully configured. Missing: {detail}")
     subject, plain, html = build_digest()
     send_email(cfg, subject, plain, html=html)
     store.update(notify_last_sent=dt.datetime.utcnow().isoformat())
@@ -68,7 +86,7 @@ def send_digest_now() -> None:
 def _loop() -> None:
     while not _stop.is_set():
         try:
-            cfg = _config_from_store()
+            cfg = _config_from_store(require_enabled=True)
             if cfg is not None:
                 now = dt.datetime.now()
                 if _is_scheduled_now(now) and not _sent_recently():
