@@ -1,10 +1,10 @@
 # Risk Monitor
 
-Local FastAPI app that aggregates positions from Schwab, Coinbase, Strike, and Fidelity into a single portfolio view, with a bitcoin-focused view and a bitcoin-backed loans tracker. Runs on Windows in a Python venv.
+Local FastAPI app that aggregates positions from Schwab, Coinbase, Strike, and Fidelity (plus on-chain BTC addresses) into a single portfolio view, with a bitcoin-focused view, a bitcoin-backed loans tracker, and an optional weekly HTML email digest. Runs on Windows in a Python venv.
 
 ## What it shows
 
-Three views, one server, one master password.
+Three views + a weekly email, one server, one master password.
 
 ### `/main` — Positions
 - Every position from every connected account, aggregated per symbol, with per-account drill-down beneath each aggregate row
@@ -25,6 +25,13 @@ Three views, one server, one master password.
 - Per-loan columns: origination, termination, principal, interest, Debt (BTC), Collateral (BTC), Net (BTC), Collateral Value, Net Value, LTV, notes
 - Aggregate row with weighted LTV = (Σ principal + Σ interest) ÷ (Σ collateral × current BTC price)
 - Net Value = Net BTC × current BTC price → your dollar equity if every loan settled today
+
+### `/notify` — Weekly email digest
+- Optional HTML email summarizing the portfolio, sent on your chosen day/hour
+- Digest contents: total market value, cost basis, unrealized P&L (colored), virtual BTC exposure, bitcoin-loan summary (LTV, Net BTC, Net Value), top 15 positions by market value
+- Sends through your own mailbox via SMTP (Yahoo/Gmail with app password, Outlook via STARTTLS)
+- **Send test email now** button to verify the whole chain before enabling the schedule
+- Background thread runs inside the app; only sends when the store is unlocked at the target time and no digest was sent in the last 6 days
 
 ## Data sources
 
@@ -115,6 +122,33 @@ Quirks handled automatically:
 Private keys are never touched. This is watch-only. Balances are confirmed on-chain only (mempool sits are excluded); pricing comes from mempool.space's public price feed.
 
 If you use an xpub/zpub to derive many addresses, add each derived address individually or ask for xpub-derivation support (BIP32/BIP84) as a follow-up.
+
+### Weekly email digest (SMTP)
+
+The digest is optional but useful for a low-effort "how is everything doing" snapshot on your inbox schedule.
+
+**Get an app password** (Yahoo shown; Gmail is analogous):
+
+1. Enable **2-Step Verification** on the mailbox (required before app passwords exist). Yahoo: Account Security. Gmail: myaccount.google.com/security
+2. Yahoo: Account Security → "External connections" → **Generate app password** / **Manage app passwords** (label the box "Risk Monitor" or similar)
+3. Gmail: myaccount.google.com/apppasswords → generate → label it
+4. Copy the 16-character string it shows you **once**. Enter with no spaces (e.g., `abcdefghijklmnop`, not `abcd efgh ijkl mnop`). You can't retrieve it later — regenerate if lost.
+
+**Configure the digest** on the `/notify` page:
+
+| Provider | SMTP host | Port | Password type |
+|----------|-----------|------|---------------|
+| Yahoo | `smtp.mail.yahoo.com` | 465 | 16-char app password |
+| Gmail | `smtp.gmail.com` | 465 | 16-char app password |
+| Outlook/Hotmail | `smtp-mail.outlook.com` | 587 | app password |
+
+Fill in:
+- **Send to** — destination email
+- **From** — leave blank to default to the SMTP user (Yahoo/Gmail require From == the logged-in user)
+- **SMTP host / port / user / app password** — per the table above
+- **Day / hour / minute** — when to fire the weekly send in local time (default: Sunday 08:00)
+
+Click **Save settings**, then **Send test email now** to verify SMTP works. Once the test lands, check **Enable weekly email** and save again. The scheduler thread only fires when the store is unlocked, so leave the app running unlocked for the weekly send to land automatically. If it's locked at the target time, the send is skipped for that week.
 
 ## Setup
 
