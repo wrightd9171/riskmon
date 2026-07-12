@@ -870,6 +870,14 @@ CRYPTO_SORT_KEYS = {
 }
 CRYPTO_STRING_COLS = {"label", "raw_symbol"}
 
+# Only the two summable columns have a category-level subtotal, so only those
+# reorder the category blocks themselves. Native qty mixes coins and ETF shares,
+# so it has no meaningful aggregate and leaves the semantic order intact.
+CRYPTO_CAT_SORT_KEYS = {
+    "virtual_btc": lambda c: (c.get("subtotal_btc") is None, c.get("subtotal_btc") or 0),
+    "market_value": lambda c: (c.get("subtotal_mv") is None, c.get("subtotal_mv") or 0),
+}
+
 
 @router.get("/crypto", response_class=HTMLResponse)
 def crypto_view(
@@ -976,9 +984,12 @@ def crypto_view(
         if include_all and other:
             categories.append(_category("Other Positions", other))
 
-        # Sort rows within each category; category order and subtotals are preserved.
+        # Sort rows within each category, then reorder the category blocks
+        # themselves by their subtotal when sorting on a summable column.
         for cat in categories:
             cat["rows"].sort(key=CRYPTO_SORT_KEYS[sort], reverse=(dir == "desc"))
+        if sort in CRYPTO_CAT_SORT_KEYS:
+            categories.sort(key=CRYPTO_CAT_SORT_KEYS[sort], reverse=(dir == "desc"))
 
         total_btc = sum(c["subtotal_btc"] for c in categories if c["subtotal_btc"] is not None)
         total_mv = sum(c["subtotal_mv"] for c in categories if c["subtotal_mv"] is not None)
