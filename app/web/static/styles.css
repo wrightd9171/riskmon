@@ -77,7 +77,18 @@ table.positions tr td.pnl-neg { background: #fee2e2 !important; color: #991b1b !
 table.positions tr.total td.pnl-pos { background: #bbf7d0 !important; }
 table.positions tr.total td.pnl-neg { background: #fecaca !important; }
 table.positions .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.positions tr[hidden] { display: none; }
 table.positions tr.agg td { border-top: 2px solid #cbd5e1; background: #f8fafc; }
+table.positions tr.agg { cursor: pointer; }
+table.positions tr.agg:hover td { background: #eef2f7; }
+table.positions tr.agg:focus { outline: 2px solid #93c5fd; outline-offset: -2px; }
+table.positions .caret { display: inline-block; width: 14px; color: #64748b;
+                         font-size: 11px; transition: transform 0.1s; }
+table.positions .caret::before { content: "\25B8"; }
+table.positions tr.agg.open .caret::before { content: "\25BE"; }
+table.positions .acct-count { font-weight: 400; }
+
+.drill-actions { margin: 0 0 8px; }
 table.positions tr.total td { border-top: 3px double #64748b; background: #f1f5f9;
                               font-size: 15px; padding-top: 12px; padding-bottom: 12px; }
 table.positions tr.acct td { color: #475569; }

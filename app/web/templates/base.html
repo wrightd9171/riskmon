@@ -9,7 +9,7 @@
 <body>
   <header>
     <div class="brand"><a href="/">Risk Monitor</a></div>
-    <nav>{% block nav %}{% endblock %}</nav>
+    <nav>{% block nav %}{% include "_nav.html" %}{% endblock %}</nav>
   </header>
   <main>
     {% block content %}{% endblock %}

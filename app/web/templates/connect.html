@@ -1,8 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Connect · Risk Monitor{% endblock %}
-{% block nav %}
-<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
-{% endblock %}
 {% block content %}
 <h2>Connect to Schwab</h2>
 {% if connected %}
@@ -28,6 +25,14 @@
   <p>Coinbase is connected. <a href="/coinbase">Manage or rotate the API key</a>.</p>
 {% else %}
   <p><a href="/coinbase">Connect Coinbase</a> to include crypto balances alongside Schwab.</p>
+{% endif %}
+
+<hr>
+<h2>Robinhood (Crypto)</h2>
+{% if robinhood_connected %}
+  <p>Robinhood is connected. <a href="/robinhood">Manage or rotate the key</a>.</p>
+{% else %}
+  <p><a href="/robinhood">Connect Robinhood</a> to include your Robinhood crypto balances. Read-only — this app never places orders.</p>
 {% endif %}
 
 <hr>

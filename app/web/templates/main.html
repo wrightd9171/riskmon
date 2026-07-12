@@ -1,16 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Positions · Risk Monitor{% endblock %}
-{% block nav %}
-<form method="post" action="/refresh"><button type="submit">Refresh</button></form>
-<a href="/crypto">Crypto</a>
-<a href="/loans">Loans</a>
-<a href="/connect">Schwab</a>
-<a href="/coinbase">Coinbase</a>
-<a href="/strike">Strike</a>
-<a href="/onchain">On-chain</a>
-<a href="/notify">Notify</a>
-<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
-{% endblock %}
 {% block content %}
 
 <section class="filter">
@@ -54,6 +43,15 @@
 <td class="num{% if val is not none and val > 0 %} pnl-pos{% elif val is not none and val < 0 %} pnl-neg{% endif %}">{{ val | num(0) }}</td>
 {%- endmacro %}
 
+{% if symbols %}
+<div class="drill-actions">
+  <button type="button" class="link" id="expand-all">Expand all</button>
+  <span class="hint">&nbsp;·&nbsp;</span>
+  <button type="button" class="link" id="collapse-all">Collapse all</button>
+  <span class="hint">&nbsp;— click a row to drill into account-level detail</span>
+</div>
+{% endif %}
+
 <table class="positions">
   <thead>
     <tr>
@@ -79,8 +77,9 @@
   {% endif %}
   {% for s in symbols %}
     {% set is_btc = s.symbol == 'BTC' %}
-    <tr class="agg">
-      <td><strong>{{ s.symbol }}</strong></td>
+    {% set gid = loop.index0 %}
+    <tr class="agg" data-group="{{ gid }}" aria-expanded="false" tabindex="0">
+      <td><span class="caret"></span><strong>{{ s.symbol }}</strong> <span class="hint acct-count">({{ s.per_account | length }})</span></td>
       <td>{{ s.description }}</td>
       <td class="num">{{ s.last_price | price }}</td>
       <td class="num">{{ (s.quantity | qty_btc) if is_btc else (s.quantity | qty) }}</td>
@@ -90,7 +89,7 @@
       {{ pnl_cell(s.unrealized_pnl) }}
     </tr>
     {% for p in s.per_account %}
-      <tr class="acct">
+      <tr class="acct" data-group="{{ gid }}" hidden>
         <td class="indent">{{ p.account_label }}</td>
         <td></td>
         <td class="num">{{ p.last_price | price }}</td>
@@ -108,5 +107,38 @@
 </table>
 
 <p class="hint">Tax-lot detail with lot open dates is not exposed by Schwab's Trader API. Position-level weighted-average cost basis is shown. Coinbase/Strike positions omit cost basis (transfers make it unreliable).</p>
+
+<script>
+(function () {
+  function setGroup(row, open) {
+    row.classList.toggle("open", open);
+    row.setAttribute("aria-expanded", open ? "true" : "false");
+    var g = row.getAttribute("data-group");
+    document.querySelectorAll('tr.acct[data-group="' + g + '"]').forEach(function (r) {
+      r.hidden = !open;
+    });
+  }
+  function setAll(open) {
+    document.querySelectorAll("table.positions tr.agg").forEach(function (row) {
+      setGroup(row, open);
+    });
+  }
+  document.querySelectorAll("table.positions tr.agg").forEach(function (row) {
+    row.addEventListener("click", function () {
+      setGroup(row, !row.classList.contains("open"));
+    });
+    row.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setGroup(row, !row.classList.contains("open"));
+      }
+    });
+  });
+  var expand = document.getElementById("expand-all");
+  var collapse = document.getElementById("collapse-all");
+  if (expand) expand.addEventListener("click", function () { setAll(true); });
+  if (collapse) collapse.addEventListener("click", function () { setAll(false); });
+})();
+</script>
 
 {% endblock %}

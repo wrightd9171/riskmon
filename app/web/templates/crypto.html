@@ -1,14 +1,11 @@
 {% extends "base.html" %}
 {% block title %}BTC Exposure · Risk Monitor{% endblock %}
-{% block nav %}
-<a href="/main">Positions</a>
-<a href="/loans">Loans</a>
-<a href="/connect">Schwab</a>
-<a href="/coinbase">Coinbase</a>
-<a href="/strike">Strike</a>
-<form method="post" action="/lock"><button type="submit" class="link">Lock</button></form>
-{% endblock %}
 {% block content %}
+{% macro sort_arrow(col) -%}
+  {%- if sort_by == col -%}
+    <span class="sort-arrow">{{ "↑" if sort_dir == "asc" else "↓" }}</span>
+  {%- endif -%}
+{%- endmacro %}
 <h2>Virtual BTC exposure</h2>
 
 <p>
@@ -18,14 +15,23 @@
   <a href="{{ toggle_all_url }}" class="link">{{ "Exclude non-BTC positions" if include_all else "Include all other positions" }}</a>
 </p>
 
+{% if categories %}
+<div class="drill-actions">
+  <button type="button" class="link" id="expand-all">Expand all</button>
+  <span class="hint">&nbsp;·&nbsp;</span>
+  <button type="button" class="link" id="collapse-all">Collapse all</button>
+  <span class="hint">&nbsp;— click a category to drill into its holdings</span>
+</div>
+{% endif %}
+
 <table class="positions">
   <thead>
     <tr>
-      <th>Source</th>
-      <th>Symbol</th>
-      <th class="num">Native qty</th>
-      <th class="num">Virtual BTC</th>
-      <th class="num">Market Value</th>
+      <th><a href="{{ sort_link('label') }}">Source</a>{{ sort_arrow('label') }}</th>
+      <th><a href="{{ sort_link('raw_symbol') }}">Symbol</a>{{ sort_arrow('raw_symbol') }}</th>
+      <th class="num"><a href="{{ sort_link('raw_qty') }}">Native qty</a>{{ sort_arrow('raw_qty') }}</th>
+      <th class="num"><a href="{{ sort_link('virtual_btc') }}">Virtual BTC</a>{{ sort_arrow('virtual_btc') }}</th>
+      <th class="num"><a href="{{ sort_link('market_value') }}">Market Value</a>{{ sort_arrow('market_value') }}</th>
     </tr>
   </thead>
   <tbody>
@@ -37,13 +43,14 @@
     </tr>
     {% endif %}
     {% for cat in categories %}
-      <tr class="agg">
-        <td colspan="3"><strong>{{ cat.name }}</strong></td>
+      {% set gid = loop.index0 %}
+      <tr class="agg" data-group="{{ gid }}" aria-expanded="false" tabindex="0">
+        <td colspan="3"><span class="caret"></span><strong>{{ cat.name }}</strong> <span class="hint acct-count">({{ cat.rows | length }})</span></td>
         <td class="num"><strong>{{ cat.subtotal_btc | qty_btc }}</strong></td>
         <td class="num"><strong>{{ cat.subtotal_mv | num(0) }}</strong></td>
       </tr>
       {% for item in cat.rows %}
-      <tr class="acct">
+      <tr class="acct" data-group="{{ gid }}" hidden>
         <td class="indent">{{ item.label }}</td>
         <td>{{ item.raw_symbol }}</td>
         <td class="num">{% if item.raw_qty is not none %}{{ item.raw_qty | qty }}{% endif %}</td>
@@ -58,4 +65,38 @@
 </table>
 
 <p class="hint">Direct BTC = native holding. IBIT ETF and long IBIT options are converted to virtual BTC by dividing market value by the current BTC price. Short options are excluded. Strike Loan Equity = total loan collateral − (total debt ÷ BTC price).</p>
+
+<script>
+(function () {
+  function setGroup(row, open) {
+    row.classList.toggle("open", open);
+    row.setAttribute("aria-expanded", open ? "true" : "false");
+    var g = row.getAttribute("data-group");
+    document.querySelectorAll('tr.acct[data-group="' + g + '"]').forEach(function (r) {
+      r.hidden = !open;
+    });
+  }
+  function setAll(open) {
+    document.querySelectorAll("table.positions tr.agg").forEach(function (row) {
+      setGroup(row, open);
+    });
+  }
+  document.querySelectorAll("table.positions tr.agg").forEach(function (row) {
+    row.addEventListener("click", function () {
+      setGroup(row, !row.classList.contains("open"));
+    });
+    row.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setGroup(row, !row.classList.contains("open"));
+      }
+    });
+  });
+  var expand = document.getElementById("expand-all");
+  var collapse = document.getElementById("collapse-all");
+  if (expand) expand.addEventListener("click", function () { setAll(true); });
+  if (collapse) collapse.addEventListener("click", function () { setAll(false); });
+})();
+</script>
+
 {% endblock %}

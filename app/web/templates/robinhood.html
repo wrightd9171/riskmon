@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Robinhood · Risk Monitor{% endblock %}
+{% block content %}
+<h2>Connect Robinhood (Crypto)</h2>
+
+<p class="hint"><strong>Read-only:</strong> this app only ever reads your Robinhood crypto
+balances — it never places or cancels orders. Robinhood does not offer a read-only key
+scope, so the safeguard is in this app, not in the key itself. Keep the key private.</p>
+
+{% if connected %}
+  <p>Robinhood is connected{% if api_key_preview %} with API key <code>{{ api_key_preview }}</code>{% endif %}.</p>
+  <form method="post" action="/robinhood/disconnect" style="display:inline">
+    <button type="submit">Disconnect Robinhood</button>
+  </form>
+  <p class="hint" style="margin-top:16px">To rotate credentials, generate a new key pair and re-register below.</p>
+  <hr>
+{% endif %}
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if message %}<p class="hint">{{ message }}</p>{% endif %}
+
+<h3>Step 1 — Generate a key pair</h3>
+<p>This app generates an Ed25519 key pair. The private key is encrypted with your master
+password and never leaves this machine; you register the <em>public</em> key with Robinhood.</p>
+<form method="post" action="/robinhood/keygen">
+  <button type="submit">{{ "Generate new key pair" if public_key else "Generate key pair" }}</button>
+</form>
+
+{% if public_key %}
+<fieldset style="margin-top:16px">
+  <legend>Your public key</legend>
+  <p class="hint">Copy this and paste it into Robinhood's API Credentials Portal (below).</p>
+  <label>Public key (base64)
+    <textarea rows="2" readonly onclick="this.select()">{{ public_key }}</textarea>
+  </label>
+</fieldset>
+
+<h3>Step 2 — Register it at Robinhood</h3>
+<p>Go to the <a href="https://robinhood.com/account/crypto" target="_blank">Robinhood Crypto account settings</a>
+&rarr; <strong>API</strong> (the API Credentials Portal), create a credential, and paste the
+public key above. Robinhood will issue an <strong>API key</strong>. You must have an active
+Robinhood Crypto account.</p>
+
+<h3>Step 3 — Paste the API key Robinhood gave you</h3>
+<form method="post" action="/robinhood">
+  <fieldset>
+    <legend>Robinhood API key</legend>
+    <label>API key
+      <input type="text" name="api_key" value="{{ api_key or '' }}" placeholder="rh-api-..." required>
+    </label>
+  </fieldset>
+  <button type="submit">Save &amp; verify</button>
+</form>
+{% else %}
+<p class="hint">Generate a key pair first — then the registration steps will appear here.</p>
+{% endif %}
+
+{% endblock %}

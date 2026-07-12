@@ -19,6 +19,8 @@ from .. import scheduler as digest_scheduler
 from ..db import ChainAddress
 from ..fidelity import sync as fidelity_sync
 from ..onchain import sync as onchain_sync
+from ..robinhood.client import RobinhoodAuthError, generate_keypair, verify_connection
+from ..robinhood.sync import sync_all as robinhood_sync_all
 from ..schwab import oauth as schwab_oauth
 from ..schwab.client import TokenError
 from ..schwab.sync import sync_all as schwab_sync_all
@@ -83,6 +85,8 @@ def _gate(request: Request) -> Optional[RedirectResponse]:
 def _account_label(account: Account) -> str:
     if account.broker == "coinbase":
         return "Coinbase"
+    if account.broker == "robinhood":
+        return "Robinhood"
     if account.broker == "strike":
         return "Strike"
     if account.broker == "fidelity":
@@ -101,6 +105,7 @@ def _any_broker_configured() -> bool:
     return bool(
         store.get("refresh_token")
         or store.get("coinbase_key_name")
+        or store.get("robinhood_api_key")
         or store.get("strike_api_key")
         or fidelity_sync.has_csv()
         or onchain_sync.has_addresses()
@@ -198,6 +203,7 @@ def connect_get(request: Request):
             "status": schwab_oauth.status(),
             "connected": bool(store.get("refresh_token")),
             "coinbase_connected": bool(store.get("coinbase_key_name")),
+            "robinhood_connected": bool(store.get("robinhood_api_key")),
             "strike_connected": bool(store.get("strike_api_key")),
             "fidelity_csv": fidelity_csv.name if fidelity_csv else None,
         },
@@ -462,6 +468,14 @@ def refresh_post():
         except httpx.HTTPStatusError as exc:
             errors.append(f"Coinbase sync failed: {exc}")
 
+    if store.get("robinhood_api_key"):
+        try:
+            robinhood_sync_all()
+        except RobinhoodAuthError as exc:
+            errors.append(f"Robinhood auth failed: {exc}")
+        except httpx.HTTPStatusError as exc:
+            errors.append(f"Robinhood sync failed: {exc}")
+
     if store.get("strike_api_key"):
         try:
             strike_sync_all()
@@ -564,6 +578,94 @@ def coinbase_disconnect():
         return RedirectResponse("/unlock", status_code=303)
     store.update(coinbase_key_name=None, coinbase_private_key=None)
     return RedirectResponse("/coinbase", status_code=303)
+
+
+def _robinhood_context(**overrides) -> dict:
+    api_key = store.get("robinhood_api_key") or ""
+    preview = (api_key[:6] + "…" + api_key[-4:]) if len(api_key) > 12 else api_key
+    ctx = {
+        "connected": bool(api_key),
+        "api_key_preview": preview,
+        "public_key": store.get("robinhood_public_key") or "",
+        "api_key": "",
+        "error": None,
+        "message": None,
+    }
+    ctx.update(overrides)
+    return ctx
+
+
+@router.get("/robinhood", response_class=HTMLResponse)
+def robinhood_get(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    return TEMPLATES.TemplateResponse(request, "robinhood.html", _robinhood_context())
+
+
+@router.post("/robinhood/keygen", response_class=HTMLResponse)
+def robinhood_keygen(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    _private_b64, public_b64 = generate_keypair()
+    store.update(robinhood_private_key=_private_b64, robinhood_public_key=public_b64)
+    return TEMPLATES.TemplateResponse(
+        request,
+        "robinhood.html",
+        _robinhood_context(
+            public_key=public_b64,
+            message=(
+                "New key pair generated. Register the public key with Robinhood, "
+                "then paste the API key it issues below."
+            ),
+        ),
+    )
+
+
+@router.post("/robinhood", response_class=HTMLResponse)
+def robinhood_post(request: Request, api_key: str = Form(...)):
+    gate = _gate(request)
+    if gate:
+        return gate
+    key = api_key.strip()
+    if not key:
+        return TEMPLATES.TemplateResponse(
+            request, "robinhood.html",
+            _robinhood_context(error="API key is required."),
+            status_code=400,
+        )
+    if not store.get("robinhood_private_key"):
+        return TEMPLATES.TemplateResponse(
+            request, "robinhood.html",
+            _robinhood_context(
+                error="Generate a key pair first, then register its public key with Robinhood."
+            ),
+            status_code=400,
+        )
+    store.update(robinhood_api_key=key)
+    try:
+        verify_connection()
+    except RobinhoodAuthError as exc:
+        store.update(robinhood_api_key=None)
+        return TEMPLATES.TemplateResponse(
+            request, "robinhood.html",
+            _robinhood_context(error=str(exc)),
+            status_code=400,
+        )
+    return RedirectResponse("/main", status_code=303)
+
+
+@router.post("/robinhood/disconnect")
+def robinhood_disconnect():
+    if not store.is_unlocked():
+        return RedirectResponse("/unlock", status_code=303)
+    store.update(
+        robinhood_api_key=None,
+        robinhood_private_key=None,
+        robinhood_public_key=None,
+    )
+    return RedirectResponse("/robinhood", status_code=303)
 
 
 @router.get("/strike", response_class=HTMLResponse)
@@ -759,11 +861,30 @@ def _category(name: str, rows: list[dict]) -> dict:
     }
 
 
+CRYPTO_SORT_KEYS = {
+    "label": lambda x: ((x.get("label") or "").lower(),),
+    "raw_symbol": lambda x: ((x.get("raw_symbol") or "").lower(),),
+    "raw_qty": lambda x: (x.get("raw_qty") is None, x.get("raw_qty") or 0),
+    "virtual_btc": lambda x: (x.get("virtual_btc") is None, x.get("virtual_btc") or 0),
+    "market_value": lambda x: (x.get("market_value") is None, x.get("market_value") or 0),
+}
+CRYPTO_STRING_COLS = {"label", "raw_symbol"}
+
+
 @router.get("/crypto", response_class=HTMLResponse)
-def crypto_view(request: Request, include_all: int = Query(default=0)):
+def crypto_view(
+    request: Request,
+    include_all: int = Query(default=0),
+    sort: str = Query(default="market_value"),
+    dir: str = Query(default="desc"),
+):
     gate = _gate(request)
     if gate:
         return gate
+    if sort not in CRYPTO_SORT_KEYS:
+        sort = "market_value"
+    if dir not in ("asc", "desc"):
+        dir = "desc"
     with SessionLocal() as session:
         btc_price = _current_btc_price(session)
 
@@ -853,13 +974,30 @@ def crypto_view(request: Request, include_all: int = Query(default=0)):
                 "subtotal_mv": loan_equity_mv,
             })
         if include_all and other:
-            other.sort(key=lambda x: -(x.get("market_value") or 0))
             categories.append(_category("Other Positions", other))
+
+        # Sort rows within each category; category order and subtotals are preserved.
+        for cat in categories:
+            cat["rows"].sort(key=CRYPTO_SORT_KEYS[sort], reverse=(dir == "desc"))
 
         total_btc = sum(c["subtotal_btc"] for c in categories if c["subtotal_btc"] is not None)
         total_mv = sum(c["subtotal_mv"] for c in categories if c["subtotal_mv"] is not None)
 
-        toggle_all_url = "/crypto" if include_all else "/crypto?include_all=1"
+        def sort_link(col: str) -> str:
+            if col == sort:
+                new_dir = "asc" if dir == "desc" else "desc"
+            else:
+                new_dir = "asc" if col in CRYPTO_STRING_COLS else "desc"
+            params: list[tuple[str, str]] = []
+            if include_all:
+                params.append(("include_all", "1"))
+            params.extend([("sort", col), ("dir", new_dir)])
+            return "/crypto?" + urlencode(params)
+
+        toggle_params = [("sort", sort), ("dir", dir)]
+        if not include_all:
+            toggle_params.insert(0, ("include_all", "1"))
+        toggle_all_url = "/crypto?" + urlencode(toggle_params)
 
         return TEMPLATES.TemplateResponse(request, "crypto.html", {
             "categories": categories,
@@ -868,6 +1006,9 @@ def crypto_view(request: Request, include_all: int = Query(default=0)):
             "btc_price": btc_price,
             "include_all": bool(include_all),
             "toggle_all_url": toggle_all_url,
+            "sort_by": sort,
+            "sort_dir": dir,
+            "sort_link": sort_link,
         })
 
 
