@@ -1,0 +1,10 @@
+<h2>Settings</h2>
+<nav class="settings-tabs">
+  <a href="/connect"{% if active_tab == 'schwab' %} class="active"{% endif %}>Schwab</a>
+  <a href="/coinbase"{% if active_tab == 'coinbase' %} class="active"{% endif %}>Coinbase</a>
+  <a href="/robinhood"{% if active_tab == 'robinhood' %} class="active"{% endif %}>Robinhood</a>
+  <a href="/strike"{% if active_tab == 'strike' %} class="active"{% endif %}>Strike</a>
+  <a href="/fidelity"{% if active_tab == 'fidelity' %} class="active"{% endif %}>Fidelity</a>
+  <a href="/onchain"{% if active_tab == 'onchain' %} class="active"{% endif %}>On-chain</a>
+  <a href="/notify"{% if active_tab == 'notify' %} class="active"{% endif %}>Notify</a>
+</nav>

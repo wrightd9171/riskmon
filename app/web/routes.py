@@ -190,23 +190,39 @@ def lock_post():
     return RedirectResponse("/unlock", status_code=303)
 
 
+@router.get("/settings")
+def settings_redirect(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    return RedirectResponse("/connect", status_code=303)
+
+
 @router.get("/connect", response_class=HTMLResponse)
 def connect_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    fidelity_csv = fidelity_sync.find_csv()
     return TEMPLATES.TemplateResponse(
         request,
         "connect.html",
         {
             "status": schwab_oauth.status(),
             "connected": bool(store.get("refresh_token")),
-            "coinbase_connected": bool(store.get("coinbase_key_name")),
-            "robinhood_connected": bool(store.get("robinhood_api_key")),
-            "strike_connected": bool(store.get("strike_api_key")),
-            "fidelity_csv": fidelity_csv.name if fidelity_csv else None,
         },
+    )
+
+
+@router.get("/fidelity", response_class=HTMLResponse)
+def fidelity_get(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    csv = fidelity_sync.find_csv()
+    return TEMPLATES.TemplateResponse(
+        request,
+        "fidelity.html",
+        {"fidelity_csv": csv.name if csv else None},
     )
 
 

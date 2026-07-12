@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Robinhood · Risk Monitor{% endblock %}
 {% block content %}
-<h2>Connect Robinhood (Crypto)</h2>
+{% set active_tab = 'robinhood' %}
+{% include "_settings_tabs.html" %}
+<h3>Connect Robinhood (Crypto)</h3>
 
 <p class="hint"><strong>Read-only:</strong> this app only ever reads your Robinhood crypto
 balances — it never places or cancels orders. Robinhood does not offer a read-only key

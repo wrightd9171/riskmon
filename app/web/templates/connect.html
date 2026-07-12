@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Connect · Risk Monitor{% endblock %}
+{% block title %}Schwab · Settings · Risk Monitor{% endblock %}
 {% block content %}
-<h2>Connect to Schwab</h2>
+{% set active_tab = 'schwab' %}
+{% include "_settings_tabs.html" %}
+<h3>Connect to Schwab</h3>
 {% if connected %}
   <p>Schwab is connected. <a href="/main">Go to positions view</a>, or re-authorize below if the refresh token has expired.</p>
 {% else %}
@@ -17,38 +19,5 @@
   <p class="hint">Waiting for Schwab callback…</p>
 {% elif status and status.status == "success" %}
   <p class="hint">Last authorization succeeded.</p>
-{% endif %}
-
-<hr>
-<h2>Coinbase</h2>
-{% if coinbase_connected %}
-  <p>Coinbase is connected. <a href="/coinbase">Manage or rotate the API key</a>.</p>
-{% else %}
-  <p><a href="/coinbase">Connect Coinbase</a> to include crypto balances alongside Schwab.</p>
-{% endif %}
-
-<hr>
-<h2>Robinhood (Crypto)</h2>
-{% if robinhood_connected %}
-  <p>Robinhood is connected. <a href="/robinhood">Manage or rotate the key</a>.</p>
-{% else %}
-  <p><a href="/robinhood">Connect Robinhood</a> to include your Robinhood crypto balances. Read-only — this app never places orders.</p>
-{% endif %}
-
-<hr>
-<h2>Strike</h2>
-{% if strike_connected %}
-  <p>Strike is connected. <a href="/strike">Manage or rotate the API key</a>. Loans are entered on the <a href="/loans">Loans</a> page.</p>
-{% else %}
-  <p><a href="/strike">Connect Strike</a> to include BTC balances. Bitcoin-backed loans are entered manually on the <a href="/loans">Loans</a> page.</p>
-{% endif %}
-
-<hr>
-<h2>Fidelity</h2>
-<p>Fidelity has no public API. Export your positions from fidelity.com (<em>Positions → Download</em>) and drop the CSV into <code>data/</code> — any filename starting with <code>Fidelity_</code>. Refresh will pick it up.</p>
-{% if fidelity_csv %}
-  <p>Latest CSV found: <code>{{ fidelity_csv }}</code></p>
-{% else %}
-  <p class="hint">No Fidelity CSV in data folder yet.</p>
 {% endif %}
 {% endblock %}

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Strike · Risk Monitor{% endblock %}
 {% block content %}
-<h2>Connect Strike</h2>
+{% set active_tab = 'strike' %}
+{% include "_settings_tabs.html" %}
+<h3>Connect Strike</h3>
 
 {% if connected %}
   <p>Strike is connected.</p>

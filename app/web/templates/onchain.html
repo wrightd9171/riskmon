@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}On-chain · Risk Monitor{% endblock %}
 {% block content %}
-<h2>On-chain (self-custody) addresses</h2>
+{% set active_tab = 'onchain' %}
+{% include "_settings_tabs.html" %}
+<h3>On-chain (self-custody) addresses</h3>
 
 <p>Add public receive addresses to include their balances in the portfolio view. Balances are queried at <a href="https://mempool.space" target="_blank">mempool.space</a> — no API key needed. Private keys are never involved: watch-only.</p>
 

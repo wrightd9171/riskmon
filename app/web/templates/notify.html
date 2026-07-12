@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Notifications · Risk Monitor{% endblock %}
 {% block content %}
-<h2>Weekly email digest</h2>
+{% set active_tab = 'notify' %}
+{% include "_settings_tabs.html" %}
+<h3>Weekly email digest</h3>
 
 <p>Schedule a weekly HTML email summarizing your portfolio, virtual BTC exposure, and loan LTV. Uses standard SMTP — you provide the mailbox.</p>
 

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Coinbase · Risk Monitor{% endblock %}
 {% block content %}
-<h2>Connect Coinbase</h2>
+{% set active_tab = 'coinbase' %}
+{% include "_settings_tabs.html" %}
+<h3>Connect Coinbase</h3>
 
 {% if connected %}
   <p>Coinbase is connected with key <code>{{ key_name }}</code>.</p>
