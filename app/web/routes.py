@@ -870,10 +870,15 @@ CRYPTO_SORT_KEYS = {
 }
 CRYPTO_STRING_COLS = {"label", "raw_symbol"}
 
-# Only the two summable columns have a category-level subtotal, so only those
-# reorder the category blocks themselves. Native qty mixes coins and ETF shares,
-# so it has no meaningful aggregate and leaves the semantic order intact.
+# These columns reorder the category blocks themselves, not just rows within
+# them. Summable columns sort by subtotal; symbol sorts by the block's
+# representative (alphabetically-first) symbol, since each block is essentially
+# one instrument (Direct BTC → BTC, BTC ETF → IBIT). Native qty has no
+# meaningful cross-instrument aggregate, so it leaves the semantic order intact.
 CRYPTO_CAT_SORT_KEYS = {
+    "raw_symbol": lambda c: (
+        min((r.get("raw_symbol") or "" for r in c["rows"]), default="").lower(),
+    ),
     "virtual_btc": lambda c: (c.get("subtotal_btc") is None, c.get("subtotal_btc") or 0),
     "market_value": lambda c: (c.get("subtotal_mv") is None, c.get("subtotal_mv") or 0),
 }
