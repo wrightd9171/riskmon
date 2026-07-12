@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Bitcoin Loans · Risk Monitor{% endblock %}
 {% block content %}
+{% macro sort_arrow(col) -%}
+  {%- if sort_by == col -%}
+    <span class="sort-arrow">{{ "↑" if sort_dir == "asc" else "↓" }}</span>
+  {%- endif -%}
+{%- endmacro %}
 <h2>Bitcoin-backed loans</h2>
 
 <p>
@@ -12,17 +17,17 @@
 <table class="positions">
   <thead>
     <tr>
-      <th>Originated</th>
-      <th>Terminates</th>
-      <th class="num">Principal</th>
-      <th class="num">Interest</th>
-      <th class="num">Debt (BTC)</th>
-      <th class="num">Collateral (BTC)</th>
-      <th class="num">Net (BTC)</th>
-      <th class="num">Collateral Value</th>
-      <th class="num">Net Value</th>
-      <th class="num">LTV</th>
-      <th>Notes</th>
+      <th><a href="{{ sort_link('origination_date') }}">Originated</a>{{ sort_arrow('origination_date') }}</th>
+      <th><a href="{{ sort_link('termination_date') }}">Terminates</a>{{ sort_arrow('termination_date') }}</th>
+      <th class="num"><a href="{{ sort_link('principal') }}">Principal</a>{{ sort_arrow('principal') }}</th>
+      <th class="num"><a href="{{ sort_link('interest') }}">Interest</a>{{ sort_arrow('interest') }}</th>
+      <th class="num"><a href="{{ sort_link('debt_btc') }}">Debt (BTC)</a>{{ sort_arrow('debt_btc') }}</th>
+      <th class="num"><a href="{{ sort_link('collateral') }}">Collateral (BTC)</a>{{ sort_arrow('collateral') }}</th>
+      <th class="num"><a href="{{ sort_link('net_btc') }}">Net (BTC)</a>{{ sort_arrow('net_btc') }}</th>
+      <th class="num"><a href="{{ sort_link('collateral_value') }}">Collateral Value</a>{{ sort_arrow('collateral_value') }}</th>
+      <th class="num"><a href="{{ sort_link('net_mv') }}">Net Value</a>{{ sort_arrow('net_mv') }}</th>
+      <th class="num"><a href="{{ sort_link('ltv') }}">LTV</a>{{ sort_arrow('ltv') }}</th>
+      <th><a href="{{ sort_link('notes') }}">Notes</a>{{ sort_arrow('notes') }}</th>
       <th></th>
     </tr>
   </thead>

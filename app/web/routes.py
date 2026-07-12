@@ -1028,11 +1028,37 @@ def crypto_view(
         })
 
 
+LOAN_SORT_KEYS = {
+    "origination_date": lambda x: (x["origination_date"] is None, x["origination_date"]),
+    "termination_date": lambda x: (x["termination_date"] is None, x["termination_date"]),
+    "principal": lambda x: (x["principal"] is None, x["principal"] or 0),
+    "interest": lambda x: (x["interest"] is None, x["interest"] or 0),
+    "debt_btc": lambda x: (x["debt_btc"] is None, x["debt_btc"] or 0),
+    "collateral": lambda x: (x["collateral"] is None, x["collateral"] or 0),
+    "net_btc": lambda x: (x["net_btc"] is None, x["net_btc"] or 0),
+    "collateral_value": lambda x: (x["collateral_value"] is None, x["collateral_value"] or 0),
+    "net_mv": lambda x: (x["net_mv"] is None, x["net_mv"] or 0),
+    "ltv": lambda x: (x["ltv"] is None, x["ltv"] or 0),
+    "notes": lambda x: ((x["notes"] or "").lower(),),
+}
+# Columns that read most naturally ascending on first click (dates chronological,
+# notes alphabetical); everything else defaults to descending.
+LOAN_ASC_DEFAULT_COLS = {"notes", "origination_date", "termination_date"}
+
+
 @router.get("/loans", response_class=HTMLResponse)
-def loans_view(request: Request):
+def loans_view(
+    request: Request,
+    sort: str = Query(default="origination_date"),
+    dir: str = Query(default="asc"),
+):
     gate = _gate(request)
     if gate:
         return gate
+    if sort not in LOAN_SORT_KEYS:
+        sort = "origination_date"
+    if dir not in ("asc", "desc"):
+        dir = "asc"
     with SessionLocal() as session:
         loans = session.execute(
             select(BitcoinLoan).order_by(BitcoinLoan.origination_date)
@@ -1077,8 +1103,20 @@ def loans_view(request: Request):
         agg_net_mv = agg_net_btc * btc_price if agg_net_btc is not None and btc_price else None
         agg_ltv = agg_debt / agg_collateral_value if agg_collateral_value else None
 
+        rows.sort(key=LOAN_SORT_KEYS[sort], reverse=(dir == "desc"))
+
+        def sort_link(col: str) -> str:
+            if col == sort:
+                new_dir = "asc" if dir == "desc" else "desc"
+            else:
+                new_dir = "asc" if col in LOAN_ASC_DEFAULT_COLS else "desc"
+            return "/loans?" + urlencode([("sort", col), ("dir", new_dir)])
+
         return TEMPLATES.TemplateResponse(request, "loans.html", {
             "loans": rows,
+            "sort_by": sort,
+            "sort_dir": dir,
+            "sort_link": sort_link,
             "btc_price": btc_price,
             "agg": {
                 "principal": agg_principal,
