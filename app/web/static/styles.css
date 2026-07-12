@@ -60,6 +60,20 @@ hr { border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0; }
 .filter { margin-bottom: 16px; }
 .filter-actions { margin-top: 10px; }
 
+details.acct-filter { display: inline-block; position: relative; vertical-align: middle; }
+details.acct-filter > summary { cursor: pointer; list-style: none; user-select: none;
+    padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; }
+details.acct-filter > summary::-webkit-details-marker { display: none; }
+details.acct-filter > summary::after { content: " \25BE"; color: #64748b; }
+details.acct-filter[open] > summary::after { content: " \25B4"; }
+details.acct-filter > summary:hover { background: #f1f5f9; }
+.acct-menu { position: absolute; z-index: 20; margin-top: 4px; min-width: 280px;
+    max-height: 320px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1;
+    border-radius: 6px; padding: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.10); }
+.acct-option { display: block; padding: 5px 8px; white-space: nowrap; border-radius: 4px; }
+.acct-option:hover { background: #f1f5f9; }
+.acct-menu-actions { border-top: 1px solid #e2e8f0; margin-top: 6px; padding: 6px 8px 2px; }
+
 table.positions {
   width: 100%; border-collapse: collapse; background: #fff;
   border: 1px solid #e2e8f0; font-size: 14px;

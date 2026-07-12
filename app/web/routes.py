@@ -439,7 +439,16 @@ def main_view(
             toggle_pnl_params.append(("hide_no_pnl", "1"))
         toggle_pnl_url = "/main?" + urlencode(toggle_pnl_params)
 
+        # Clearing the account filter keeps the current sort and toggles.
+        clear_params = [("sort", sort), ("dir", dir)]
+        if include_zero:
+            clear_params.append(("include_zero", "1"))
+        if hide_no_pnl:
+            clear_params.append(("hide_no_pnl", "1"))
+        clear_url = "/main?" + urlencode(clear_params)
+
         return TEMPLATES.TemplateResponse(request, "main.html", {
+            "clear_url": clear_url,
             "symbols": symbols,
             "accounts": [
                 {"id": a.id, "label": _account_label(a), "synced": a.last_synced_at}

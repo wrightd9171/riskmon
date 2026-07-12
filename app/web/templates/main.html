@@ -8,28 +8,26 @@
     <input type="hidden" name="dir" value="{{ sort_dir }}">
     {% if include_zero %}<input type="hidden" name="include_zero" value="1">{% endif %}
     {% if hide_no_pnl %}<input type="hidden" name="hide_no_pnl" value="1">{% endif %}
-    <fieldset>
-      <legend>Filter by account</legend>
-      {% if accounts %}
-        {% for a in accounts %}
-          <label class="inline">
-            <input type="checkbox" name="acct" value="{{ a.id }}" {% if a.id in selected_ids %}checked{% endif %}>
-            {{ a.label }}
-            {% if a.synced %}<span class="hint">(synced {{ a.synced.strftime("%Y-%m-%d %H:%M") }} UTC)</span>{% endif %}
-          </label>
-        {% endfor %}
-        <div class="filter-actions">
-          <button type="submit">Apply filter</button>
-          <a href="/main" class="link">Clear</a>
-          <span class="hint">&nbsp;·&nbsp;</span>
-          <a href="{{ toggle_zero_url }}" class="link">{{ "Hide zero-value positions" if include_zero else "Include zero-value positions" }}</a>
-          <span class="hint">&nbsp;·&nbsp;</span>
-          <a href="{{ toggle_pnl_url }}" class="link">{{ "Show positions without P&L" if hide_no_pnl else "Hide positions without P&L" }}</a>
+    {% if accounts %}
+      <details class="acct-filter"{% if selected_ids %} open{% endif %}>
+        <summary>Accounts: {% if selected_ids %}{{ selected_ids | length }} of {{ accounts | length }}{% else %}All{% endif %}</summary>
+        <div class="acct-menu">
+          {% for a in accounts %}
+            <label class="acct-option">
+              <input type="checkbox" name="acct" value="{{ a.id }}" {% if a.id in selected_ids %}checked{% endif %} onchange="this.form.submit()">
+              {{ a.label }}{% if a.synced %} <span class="hint">· {{ a.synced.strftime("%Y-%m-%d %H:%M") }} UTC</span>{% endif %}
+            </label>
+          {% endfor %}
+          {% if selected_ids %}<div class="acct-menu-actions"><a href="{{ clear_url }}" class="link">Clear selection</a></div>{% endif %}
         </div>
-      {% else %}
-        <p class="hint">No accounts yet. Click <strong>Refresh</strong> to pull positions.</p>
-      {% endif %}
-    </fieldset>
+      </details>
+      <span class="hint">&nbsp;·&nbsp;</span>
+      <a href="{{ toggle_zero_url }}" class="link">{{ "Hide zero-value positions" if include_zero else "Include zero-value positions" }}</a>
+      <span class="hint">&nbsp;·&nbsp;</span>
+      <a href="{{ toggle_pnl_url }}" class="link">{{ "Show positions without P&L" if hide_no_pnl else "Hide positions without P&L" }}</a>
+    {% else %}
+      <p class="hint">No accounts yet. Click <strong>Refresh</strong> to pull positions.</p>
+    {% endif %}
   </form>
 </section>
 
