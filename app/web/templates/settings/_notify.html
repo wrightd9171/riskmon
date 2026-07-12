@@ -1,8 +1,3 @@
-{% extends "base.html" %}
-{% block title %}Notifications · Risk Monitor{% endblock %}
-{% block content %}
-{% set active_tab = 'notify' %}
-{% include "_settings_tabs.html" %}
 <h3>Weekly email digest</h3>
 
 <p>Schedule a weekly HTML email summarizing your portfolio, virtual BTC exposure, and loan LTV. Uses standard SMTP — you provide the mailbox.</p>
@@ -56,4 +51,3 @@
 <p class="hint">
   The scheduler runs inside this app; the digest sends only if the store is <strong>unlocked</strong> at the target time. Leave the app running and unlocked, or manually send at any time with the button above.
 </p>
-{% endblock %}

@@ -95,6 +95,9 @@ table.positions th a:hover { text-decoration: underline; }
 .settings-tabs a.active { background: #fff; color: #0f172a; font-weight: 600;
                           border-color: #cbd5e1; margin-bottom: -2px;
                           border-bottom: 2px solid #fff; }
+.settings-tabs a { cursor: pointer; }
+.settings-panel[hidden] { display: none; }
+.settings-panels { padding-top: 4px; }
 
 table.positions tr td.pnl-pos { background: #dcfce7 !important; color: #166534 !important; }
 table.positions tr td.pnl-neg { background: #fee2e2 !important; color: #991b1b !important; }

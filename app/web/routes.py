@@ -190,12 +190,68 @@ def lock_post():
     return RedirectResponse("/unlock", status_code=303)
 
 
-@router.get("/settings")
-def settings_redirect(request: Request):
+SETTINGS_TAB_KEYS = {"schwab", "coinbase", "robinhood", "strike", "fidelity", "onchain", "notify"}
+
+
+def _settings_full_ctx(request: Request, overrides: dict | None = None) -> dict:
+    """Build the context for every Settings panel at once. `overrides` is
+    {section: {field: value}} used to inject a per-section error/message."""
+    overrides = overrides or {}
+    with SessionLocal() as session:
+        addrs = session.execute(
+            select(ChainAddress).order_by(ChainAddress.chain, ChainAddress.id)
+        ).scalars().all()
+        addresses = [
+            {"id": a.id, "chain": a.chain, "address": a.address, "label": a.label or ""}
+            for a in addrs
+        ]
+    csv = fidelity_sync.find_csv()
+    rk = store.get("robinhood_api_key") or ""
+    ctx = {
+        "schwab": {"status": schwab_oauth.status(), "connected": bool(store.get("refresh_token"))},
+        "coinbase": {"connected": bool(store.get("coinbase_key_name")),
+                     "key_name": store.get("coinbase_key_name") or "", "error": None},
+        "robinhood": {"connected": bool(rk),
+                      "api_key_preview": (rk[:6] + "…" + rk[-4:]) if len(rk) > 12 else rk,
+                      "public_key": store.get("robinhood_public_key") or "",
+                      "api_key": "", "error": None, "message": None},
+        "strike": {"connected": bool(store.get("strike_api_key")), "error": None},
+        "fidelity": {"csv": csv.name if csv else None},
+        "onchain": {"addresses": addresses},
+        "notify": {
+            "enabled": bool(store.get("notify_enabled")),
+            "smtp_host": store.get("notify_smtp_host") or "smtp.mail.yahoo.com",
+            "smtp_port": store.get("notify_smtp_port") or 465,
+            "smtp_user": store.get("notify_smtp_user") or "",
+            "smtp_password_set": bool(store.get("notify_smtp_password")),
+            "email_from": store.get("notify_email_from") or "",
+            "email_to": store.get("notify_email_to") or "",
+            "dow": int(store.get("notify_dow", 6)),
+            "hour": int(store.get("notify_hour", 8)),
+            "minute": int(store.get("notify_minute", 0)),
+            "days_of_week": list(enumerate(DAYS_OF_WEEK)),
+            "last_sent": store.get("notify_last_sent") or "",
+            "error": None, "message": None,
+        },
+    }
+    for section, vals in overrides.items():
+        ctx[section].update(vals)
+    return ctx
+
+
+def _render_settings(request: Request, active_tab: str = "schwab",
+                     status_code: int = 200, **overrides) -> HTMLResponse:
+    ctx = _settings_full_ctx(request, overrides)
+    ctx["active_tab"] = active_tab if active_tab in SETTINGS_TAB_KEYS else "schwab"
+    return TEMPLATES.TemplateResponse(request, "settings.html", ctx, status_code=status_code)
+
+
+@router.get("/settings", response_class=HTMLResponse)
+def settings_get(request: Request, tab: str = Query(default="schwab")):
     gate = _gate(request)
     if gate:
         return gate
-    return RedirectResponse("/connect", status_code=303)
+    return _render_settings(request, tab)
 
 
 @router.get("/connect", response_class=HTMLResponse)
@@ -203,14 +259,7 @@ def connect_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    return TEMPLATES.TemplateResponse(
-        request,
-        "connect.html",
-        {
-            "status": schwab_oauth.status(),
-            "connected": bool(store.get("refresh_token")),
-        },
-    )
+    return RedirectResponse("/settings?tab=schwab", status_code=303)
 
 
 @router.get("/fidelity", response_class=HTMLResponse)
@@ -218,12 +267,7 @@ def fidelity_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    csv = fidelity_sync.find_csv()
-    return TEMPLATES.TemplateResponse(
-        request,
-        "fidelity.html",
-        {"fidelity_csv": csv.name if csv else None},
-    )
+    return RedirectResponse("/settings?tab=fidelity", status_code=303)
 
 
 @router.post("/connect")
@@ -536,15 +580,7 @@ def coinbase_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    return TEMPLATES.TemplateResponse(
-        request,
-        "coinbase.html",
-        {
-            "connected": bool(store.get("coinbase_key_name")),
-            "key_name": store.get("coinbase_key_name") or "",
-            "error": None,
-        },
-    )
+    return RedirectResponse("/settings?tab=coinbase", status_code=303)
 
 
 @router.post("/coinbase", response_class=HTMLResponse)
@@ -567,34 +603,24 @@ def coinbase_post(
             parsed_name = (blob.get("name") or parsed_name).strip()
             parsed_key = (blob.get("privateKey") or parsed_key).strip()
         except json.JSONDecodeError as exc:
-            return TEMPLATES.TemplateResponse(
-                request, "coinbase.html",
-                {
-                    "connected": bool(store.get("coinbase_key_name")),
-                    "key_name": store.get("coinbase_key_name") or "",
-                    "error": f"Invalid JSON: {exc}",
-                },
-                status_code=400,
+            return _render_settings(
+                request, active_tab="coinbase", status_code=400,
+                coinbase={"error": f"Invalid JSON: {exc}"},
             )
 
     parsed_key = parsed_key.replace("\\n", "\n").replace("\r\n", "\n")
 
     if not parsed_name or not parsed_key:
-        return TEMPLATES.TemplateResponse(
-            request, "coinbase.html",
-            {
-                "connected": bool(store.get("coinbase_key_name")),
-                "key_name": store.get("coinbase_key_name") or "",
-                "error": "Both key name and private key are required.",
-            },
-            status_code=400,
+        return _render_settings(
+            request, active_tab="coinbase", status_code=400,
+            coinbase={"error": "Both key name and private key are required."},
         )
 
     store.update(
         coinbase_key_name=parsed_name,
         coinbase_private_key=parsed_key,
     )
-    return RedirectResponse("/main", status_code=303)
+    return RedirectResponse("/settings?tab=coinbase", status_code=303)
 
 
 @router.post("/coinbase/disconnect")
@@ -602,22 +628,7 @@ def coinbase_disconnect():
     if not store.is_unlocked():
         return RedirectResponse("/unlock", status_code=303)
     store.update(coinbase_key_name=None, coinbase_private_key=None)
-    return RedirectResponse("/coinbase", status_code=303)
-
-
-def _robinhood_context(**overrides) -> dict:
-    api_key = store.get("robinhood_api_key") or ""
-    preview = (api_key[:6] + "…" + api_key[-4:]) if len(api_key) > 12 else api_key
-    ctx = {
-        "connected": bool(api_key),
-        "api_key_preview": preview,
-        "public_key": store.get("robinhood_public_key") or "",
-        "api_key": "",
-        "error": None,
-        "message": None,
-    }
-    ctx.update(overrides)
-    return ctx
+    return RedirectResponse("/settings?tab=coinbase", status_code=303)
 
 
 @router.get("/robinhood", response_class=HTMLResponse)
@@ -625,7 +636,7 @@ def robinhood_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    return TEMPLATES.TemplateResponse(request, "robinhood.html", _robinhood_context())
+    return RedirectResponse("/settings?tab=robinhood", status_code=303)
 
 
 @router.post("/robinhood/keygen", response_class=HTMLResponse)
@@ -635,16 +646,12 @@ def robinhood_keygen(request: Request):
         return gate
     _private_b64, public_b64 = generate_keypair()
     store.update(robinhood_private_key=_private_b64, robinhood_public_key=public_b64)
-    return TEMPLATES.TemplateResponse(
-        request,
-        "robinhood.html",
-        _robinhood_context(
-            public_key=public_b64,
-            message=(
-                "New key pair generated. Register the public key with Robinhood, "
-                "then paste the API key it issues below."
-            ),
-        ),
+    return _render_settings(
+        request, active_tab="robinhood",
+        robinhood={"message": (
+            "New key pair generated. Register the public key with Robinhood, "
+            "then paste the API key it issues below."
+        )},
     )
 
 
@@ -655,30 +662,25 @@ def robinhood_post(request: Request, api_key: str = Form(...)):
         return gate
     key = api_key.strip()
     if not key:
-        return TEMPLATES.TemplateResponse(
-            request, "robinhood.html",
-            _robinhood_context(error="API key is required."),
-            status_code=400,
+        return _render_settings(
+            request, active_tab="robinhood", status_code=400,
+            robinhood={"error": "API key is required."},
         )
     if not store.get("robinhood_private_key"):
-        return TEMPLATES.TemplateResponse(
-            request, "robinhood.html",
-            _robinhood_context(
-                error="Generate a key pair first, then register its public key with Robinhood."
-            ),
-            status_code=400,
+        return _render_settings(
+            request, active_tab="robinhood", status_code=400,
+            robinhood={"error": "Generate a key pair first, then register its public key with Robinhood."},
         )
     store.update(robinhood_api_key=key)
     try:
         verify_connection()
     except RobinhoodAuthError as exc:
         store.update(robinhood_api_key=None)
-        return TEMPLATES.TemplateResponse(
-            request, "robinhood.html",
-            _robinhood_context(error=str(exc)),
-            status_code=400,
+        return _render_settings(
+            request, active_tab="robinhood", status_code=400,
+            robinhood={"error": str(exc)},
         )
-    return RedirectResponse("/main", status_code=303)
+    return RedirectResponse("/settings?tab=robinhood", status_code=303)
 
 
 @router.post("/robinhood/disconnect")
@@ -690,7 +692,7 @@ def robinhood_disconnect():
         robinhood_private_key=None,
         robinhood_public_key=None,
     )
-    return RedirectResponse("/robinhood", status_code=303)
+    return RedirectResponse("/settings?tab=robinhood", status_code=303)
 
 
 @router.get("/strike", response_class=HTMLResponse)
@@ -698,14 +700,7 @@ def strike_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    return TEMPLATES.TemplateResponse(
-        request,
-        "strike.html",
-        {
-            "connected": bool(store.get("strike_api_key")),
-            "error": None,
-        },
-    )
+    return RedirectResponse("/settings?tab=strike", status_code=303)
 
 
 @router.post("/strike", response_class=HTMLResponse)
@@ -715,13 +710,12 @@ def strike_post(request: Request, api_key: str = Form(...)):
         return gate
     key = api_key.strip()
     if not key:
-        return TEMPLATES.TemplateResponse(
-            request, "strike.html",
-            {"connected": bool(store.get("strike_api_key")), "error": "API key is required."},
-            status_code=400,
+        return _render_settings(
+            request, active_tab="strike", status_code=400,
+            strike={"error": "API key is required."},
         )
     store.update(strike_api_key=key)
-    return RedirectResponse("/main", status_code=303)
+    return RedirectResponse("/settings?tab=strike", status_code=303)
 
 
 @router.post("/strike/disconnect")
@@ -729,7 +723,7 @@ def strike_disconnect():
     if not store.is_unlocked():
         return RedirectResponse("/unlock", status_code=303)
     store.update(strike_api_key=None)
-    return RedirectResponse("/strike", status_code=303)
+    return RedirectResponse("/settings?tab=strike", status_code=303)
 
 
 DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -740,23 +734,7 @@ def notify_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    last_sent = store.get("notify_last_sent") or ""
-    return TEMPLATES.TemplateResponse(request, "notify.html", {
-        "enabled": bool(store.get("notify_enabled")),
-        "smtp_host": store.get("notify_smtp_host") or "smtp.mail.yahoo.com",
-        "smtp_port": store.get("notify_smtp_port") or 465,
-        "smtp_user": store.get("notify_smtp_user") or "",
-        "smtp_password_set": bool(store.get("notify_smtp_password")),
-        "email_from": store.get("notify_email_from") or "",
-        "email_to": store.get("notify_email_to") or "",
-        "dow": int(store.get("notify_dow", 6)),
-        "hour": int(store.get("notify_hour", 8)),
-        "minute": int(store.get("notify_minute", 0)),
-        "days_of_week": list(enumerate(DAYS_OF_WEEK)),
-        "last_sent": last_sent,
-        "message": None,
-        "error": None,
-    })
+    return RedirectResponse("/settings?tab=notify", status_code=303)
 
 
 @router.post("/notify")
@@ -790,7 +768,7 @@ def notify_post(
     if smtp_password.strip():
         updates["notify_smtp_password"] = smtp_password
     store.update(**updates)
-    return RedirectResponse("/notify", status_code=303)
+    return RedirectResponse("/settings?tab=notify", status_code=303)
 
 
 @router.post("/notify/test")
@@ -802,7 +780,7 @@ def notify_test(request: Request):
         digest_scheduler.send_digest_now()
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Send failed: {exc}")
-    return RedirectResponse("/notify", status_code=303)
+    return RedirectResponse("/settings?tab=notify", status_code=303)
 
 
 @router.get("/onchain", response_class=HTMLResponse)
@@ -810,17 +788,7 @@ def onchain_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
-    with SessionLocal() as session:
-        addrs = session.execute(
-            select(ChainAddress).order_by(ChainAddress.chain, ChainAddress.id)
-        ).scalars().all()
-        return TEMPLATES.TemplateResponse(request, "onchain.html", {
-            "addresses": [
-                {"id": a.id, "chain": a.chain, "address": a.address, "label": a.label or ""}
-                for a in addrs
-            ],
-            "error": None,
-        })
+    return RedirectResponse("/settings?tab=onchain", status_code=303)
 
 
 @router.post("/onchain")
@@ -837,7 +805,7 @@ def onchain_post(
     address = address.strip()
     label = label.strip() or None
     if not address:
-        return RedirectResponse("/onchain", status_code=303)
+        return RedirectResponse("/settings?tab=onchain", status_code=303)
     with SessionLocal() as session:
         existing = session.scalar(
             select(ChainAddress).where(ChainAddress.address == address)
@@ -848,7 +816,7 @@ def onchain_post(
         else:
             session.add(ChainAddress(chain=chain, address=address, label=label))
         session.commit()
-    return RedirectResponse("/onchain", status_code=303)
+    return RedirectResponse("/settings?tab=onchain", status_code=303)
 
 
 @router.post("/onchain/{addr_id}/delete")
@@ -861,7 +829,7 @@ def onchain_delete(request: Request, addr_id: int):
         if addr is not None:
             session.delete(addr)
             session.commit()
-    return RedirectResponse("/onchain", status_code=303)
+    return RedirectResponse("/settings?tab=onchain", status_code=303)
 
 
 IBIT_OPTION_PATTERN = re.compile(r"^IBIT\d")

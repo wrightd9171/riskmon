@@ -1,8 +1,3 @@
-{% extends "base.html" %}
-{% block title %}Schwab · Settings · Risk Monitor{% endblock %}
-{% block content %}
-{% set active_tab = 'schwab' %}
-{% include "_settings_tabs.html" %}
 <h3>Connect to Schwab</h3>
 {% if connected %}
   <p>Schwab is connected. <a href="/main">Go to positions view</a>, or re-authorize below if the refresh token has expired.</p>
@@ -20,4 +15,3 @@
 {% elif status and status.status == "success" %}
   <p class="hint">Last authorization succeeded.</p>
 {% endif %}
-{% endblock %}

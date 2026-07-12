@@ -1,8 +1,3 @@
-{% extends "base.html" %}
-{% block title %}Fidelity · Risk Monitor{% endblock %}
-{% block content %}
-{% set active_tab = 'fidelity' %}
-{% include "_settings_tabs.html" %}
 <h3>Fidelity</h3>
 <p>Fidelity has no public API. Export your positions from fidelity.com (<em>Positions → Download</em>) and drop the CSV into <code>data/</code> — any filename starting with <code>Fidelity_</code>. Refresh will pick it up.</p>
 {% if fidelity_csv %}
@@ -10,4 +5,3 @@
 {% else %}
   <p class="hint">No Fidelity CSV in the data folder yet.</p>
 {% endif %}
-{% endblock %}

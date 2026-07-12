@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Settings · Risk Monitor{% endblock %}
+{% block content %}
+<h2>Settings</h2>
+<nav class="settings-tabs" id="settings-tabs">
+  <a href="#schwab" data-tab="schwab">Schwab</a>
+  <a href="#coinbase" data-tab="coinbase">Coinbase</a>
+  <a href="#robinhood" data-tab="robinhood">Robinhood</a>
+  <a href="#strike" data-tab="strike">Strike</a>
+  <a href="#fidelity" data-tab="fidelity">Fidelity</a>
+  <a href="#onchain" data-tab="onchain">On-chain</a>
+  <a href="#notify" data-tab="notify">Notify</a>
+</nav>
+<div class="settings-panels">
+  <section class="settings-panel" data-panel="schwab">
+    {% with connected=schwab.connected, status=schwab.status %}{% include "settings/_schwab.html" %}{% endwith %}
+  </section>
+  <section class="settings-panel" data-panel="coinbase">
+    {% with connected=coinbase.connected, key_name=coinbase.key_name, error=coinbase.error %}{% include "settings/_coinbase.html" %}{% endwith %}
+  </section>
+  <section class="settings-panel" data-panel="robinhood">
+    {% with connected=robinhood.connected, api_key_preview=robinhood.api_key_preview, public_key=robinhood.public_key, api_key=robinhood.api_key, error=robinhood.error, message=robinhood.message %}{% include "settings/_robinhood.html" %}{% endwith %}
+  </section>
+  <section class="settings-panel" data-panel="strike">
+    {% with connected=strike.connected, error=strike.error %}{% include "settings/_strike.html" %}{% endwith %}
+  </section>
+  <section class="settings-panel" data-panel="fidelity">
+    {% with fidelity_csv=fidelity.csv %}{% include "settings/_fidelity.html" %}{% endwith %}
+  </section>
+  <section class="settings-panel" data-panel="onchain">
+    {% with addresses=onchain.addresses %}{% include "settings/_onchain.html" %}{% endwith %}
+  </section>
+  <section class="settings-panel" data-panel="notify">
+    {% with enabled=notify.enabled, email_to=notify.email_to, email_from=notify.email_from, smtp_host=notify.smtp_host, smtp_port=notify.smtp_port, smtp_user=notify.smtp_user, smtp_password_set=notify.smtp_password_set, days_of_week=notify.days_of_week, dow=notify.dow, hour=notify.hour, minute=notify.minute, last_sent=notify.last_sent, error=notify.error, message=notify.message %}{% include "settings/_notify.html" %}{% endwith %}
+  </section>
+</div>
+
+<script>
+(function () {
+  var tabs = [].slice.call(document.querySelectorAll('#settings-tabs a'));
+  var panels = [].slice.call(document.querySelectorAll('.settings-panel'));
+  var names = panels.map(function (p) { return p.getAttribute('data-panel'); });
+  function show(name) {
+    if (names.indexOf(name) === -1) name = names[0];
+    panels.forEach(function (p) { p.hidden = p.getAttribute('data-panel') !== name; });
+    tabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-tab') === name); });
+    try { sessionStorage.setItem('settings-tab', name); } catch (e) {}
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function (e) {
+      e.preventDefault();
+      var name = t.getAttribute('data-tab');
+      show(name);
+      history.replaceState(null, '', '#' + name);
+    });
+  });
+  var initial = (location.hash || '').replace('#', '');
+  if (!initial) initial = "{{ active_tab or '' }}";
+  if (!initial) { try { initial = sessionStorage.getItem('settings-tab') || ''; } catch (e) {} }
+  show(initial);
+})();
+</script>
+{% endblock %}
