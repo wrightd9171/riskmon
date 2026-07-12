@@ -32,6 +32,20 @@
     </tr>
   </thead>
   <tbody>
+    {% if loans %}
+    <tr class="total">
+      <td colspan="2"><strong>Total</strong></td>
+      <td class="num">{{ agg.principal | num(2) }}</td>
+      <td class="num">{{ agg.interest | num(2) }}</td>
+      <td class="num">{{ agg.debt_btc | btc }}</td>
+      <td class="num">{{ agg.collateral | btc }}</td>
+      <td class="num">{{ agg.net_btc | btc }}</td>
+      <td class="num">{{ agg.collateral_value | num(0) }}</td>
+      <td class="num">{{ agg.net_mv | num(0) }}</td>
+      <td class="num">{% if agg.ltv is not none %}{{ (agg.ltv * 100) | num(2) }}%{% else %}—{% endif %}</td>
+      <td colspan="2"></td>
+    </tr>
+    {% endif %}
     {% for l in loans %}
       <tr>
         <td>{{ l.origination_date.strftime("%Y-%m-%d") }}</td>
@@ -55,22 +69,8 @@
     {% else %}
       <tr><td colspan="12" class="empty">No loans yet. <a href="/loans/new">Add one</a>.</td></tr>
     {% endfor %}
-    {% if loans %}
-    <tr class="agg">
-      <td colspan="2"><strong>Aggregate</strong></td>
-      <td class="num">{{ agg.principal | num(2) }}</td>
-      <td class="num">{{ agg.interest | num(2) }}</td>
-      <td class="num">{{ agg.debt_btc | btc }}</td>
-      <td class="num">{{ agg.collateral | btc }}</td>
-      <td class="num">{{ agg.net_btc | btc }}</td>
-      <td class="num">{{ agg.collateral_value | num(0) }}</td>
-      <td class="num">{{ agg.net_mv | num(0) }}</td>
-      <td class="num">{% if agg.ltv is not none %}{{ (agg.ltv * 100) | num(2) }}%{% else %}—{% endif %}</td>
-      <td colspan="2"></td>
-    </tr>
-    {% endif %}
   </tbody>
 </table>
 
-<p class="hint">Debt (BTC) = (principal + interest) ÷ current BTC price — the amount of collateral you'd forfeit if the loan settled today. Aggregate LTV = total debt ÷ (total collateral × current BTC price).</p>
+<p class="hint">Debt (BTC) = (principal + interest) ÷ current BTC price — the amount of collateral you'd forfeit if the loan settled today. Total LTV = total debt ÷ (total collateral × current BTC price).</p>
 {% endblock %}
