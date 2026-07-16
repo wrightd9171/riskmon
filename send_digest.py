@@ -52,10 +52,12 @@ def main() -> int:
         return 3
     init_db()
     try:
-        scheduler.send_digest_now()
+        warnings = scheduler.send_digest_now(refresh=True)
     except Exception as exc:  # surface a one-line reason to the Task Scheduler log
         print(f"Send failed: {exc}", file=sys.stderr)
         return 1
+    if warnings:
+        print("Refresh warnings: " + "; ".join(warnings), file=sys.stderr)
     print("Portfolio digest sent via Pushover.")
     return 0
 

@@ -23,11 +23,16 @@ Write-Host "Risk Monitor - register weekly Pushover digest task" -ForegroundColo
 Write-Host "Project: $ProjectDir"
 
 $validDays = "Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"
-$day = Read-Host "Day of week to send (default Sunday)"
-if ([string]::IsNullOrWhiteSpace($day)) { $day = "Sunday" }
-if ($validDays -notcontains $day) { throw "Invalid day: $day" }
-$time = Read-Host "Time HH:mm 24h (default 08:00)"
-if ([string]::IsNullOrWhiteSpace($time)) { $time = "08:00" }
+$daysInput = Read-Host "Days to send: weekdays / daily / comma list (default weekdays)"
+if ([string]::IsNullOrWhiteSpace($daysInput)) { $daysInput = "weekdays" }
+switch ($daysInput.ToLower()) {
+  "weekdays" { $days = @("Monday","Tuesday","Wednesday","Thursday","Friday") }
+  "daily"    { $days = @("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday") }
+  default    { $days = $daysInput.Split(",") | ForEach-Object { $_.Trim() } }
+}
+foreach ($d in $days) { if ($validDays -notcontains $d) { throw "Invalid day: $d" } }
+$time = Read-Host "Time HH:mm 24h (default 09:00)"
+if ([string]::IsNullOrWhiteSpace($time)) { $time = "09:00" }
 
 Write-Host ""
 Write-Host "Your master password will be stored on disk so the task can decrypt" -ForegroundColor Yellow
@@ -51,13 +56,13 @@ cd /d "$ProjectDir"
 "@ | Set-Content -Path $wrapper -Encoding ASCII
 
 $action   = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$wrapper`""
-$trigger  = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $day -At $time
+$trigger  = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $days -At $time
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
   -Settings $settings -Description "Sends the Risk Monitor portfolio digest via Pushover." -Force | Out-Null
 
 Write-Host ""
-Write-Host "Registered '$TaskName' - $day at $time weekly." -ForegroundColor Green
+Write-Host "Registered '$TaskName' - $($days -join ', ') at $time." -ForegroundColor Green
 Write-Host "Password file: $pwFile"
 Write-Host "Log file:      $cfgDir\notify.log"
 Write-Host ""

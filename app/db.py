@@ -70,5 +70,15 @@ class BitcoinLoan(Base):
     notes = Column(Text)
 
 
+class DailySnapshot(Base):
+    """One row per calendar date: the portfolio totals captured when the digest
+    runs, used to compute day-over-day change."""
+    __tablename__ = "daily_snapshots"
+    snapshot_date = Column(Date, primary_key=True)
+    total_market_value = Column(Float)
+    total_unrealized_pnl = Column(Float)
+    created_at = Column(DateTime)
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from sqlalchemy import select
 
-from .db import Account, BitcoinLoan, Position, SessionLocal
+from .db import Account, BitcoinLoan, DailySnapshot, Position, SessionLocal
 
 
 def _num(v, decimals=0):
@@ -266,6 +266,12 @@ def build_pushover_summary() -> tuple[str, str]:
         if net_btc is not None:
             virtual_btc += net_btc
 
+        prior = _prior_snapshot(session, dt.date.today())
+        prior_mv = prior.total_market_value if prior is not None else None
+        prior_date = prior.snapshot_date if prior is not None else None
+
+    day_change = (total_mv - prior_mv) if prior_mv is not None else None
+
     now = dt.datetime.now()
     title = f"Risk Monitor — ${_plain(total_mv)}"
 
@@ -280,6 +286,11 @@ def build_pushover_summary() -> tuple[str, str]:
     lines = [
         f"<b>{now.strftime('%A, %b %d, %Y')}</b>",
         f"<b>Total value:</b> ${_plain(total_mv)}",
+    ]
+    if day_change is not None:
+        since = f' <font color="#64748b">(since {prior_date.strftime("%b %d")})</font>' if prior_date else ""
+        lines.append(f"<b>Day P/L:</b> {_signed(day_change)}{since}")
+    lines += [
         f"<b>Unrealized P/L:</b> {_signed(total_pnl)}",
         f"<b>Virtual BTC:</b> {virtual_btc:,.4f}"
         + (f' <font color="#64748b">(BTC ${_plain(btc_price)})</font>' if btc_price else ""),
@@ -300,3 +311,39 @@ def build_pushover_summary() -> tuple[str, str]:
         lines.append(f"{s['symbol']}  ${_plain(s['market_value'])}{pnl_str}")
 
     return title, "\n".join(lines)[:1024]
+
+
+def _portfolio_totals(session) -> tuple[float, float]:
+    total_mv = 0.0
+    total_pnl = 0.0
+    for pos in session.execute(select(Position)).scalars():
+        total_mv += pos.market_value or 0
+        if pos.cost_basis_value is not None and pos.market_value is not None:
+            total_pnl += pos.market_value - pos.cost_basis_value
+    return total_mv, total_pnl
+
+
+def _prior_snapshot(session, today: "dt.date"):
+    """Most recent snapshot strictly before `today` (yesterday, or Friday on a
+    Monday). None if there is no earlier snapshot yet."""
+    return session.execute(
+        select(DailySnapshot)
+        .where(DailySnapshot.snapshot_date < today)
+        .order_by(DailySnapshot.snapshot_date.desc())
+    ).scalars().first()
+
+
+def record_daily_snapshot() -> None:
+    """Upsert today's portfolio totals so tomorrow's digest can diff against it.
+    Idempotent within a day (repeated sends overwrite today's row)."""
+    today = dt.date.today()
+    with SessionLocal() as session:
+        total_mv, total_pnl = _portfolio_totals(session)
+        snap = session.get(DailySnapshot, today)
+        if snap is None:
+            snap = DailySnapshot(snapshot_date=today)
+            session.add(snap)
+        snap.total_market_value = total_mv
+        snap.total_unrealized_pnl = total_pnl
+        snap.created_at = dt.datetime.utcnow()
+        session.commit()

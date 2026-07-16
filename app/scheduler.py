@@ -8,7 +8,8 @@ sender to call once unlocked.
 import datetime as dt
 
 from .pushover import pushover_configured, send_pushover
-from .report import build_pushover_summary
+from .refresh import refresh_all
+from .report import build_pushover_summary, record_daily_snapshot
 from .secrets_store import store
 
 
@@ -32,12 +33,15 @@ def _missing_fields() -> list[str]:
     return missing
 
 
-def send_digest_now() -> None:
-    """Build the portfolio summary and push it. Caller ensures the store is unlocked."""
+def send_digest_now(refresh: bool = True) -> list[str]:
+    """Optionally refresh prices, push the portfolio summary, and record a daily
+    snapshot for day-over-day P&L. Caller ensures the store is unlocked.
+    Returns any (non-fatal) refresh warnings."""
     cfg = _config_from_store()
     if cfg is None:
         detail = ", ".join(_missing_fields()) or "unknown"
         raise RuntimeError(f"Pushover is not fully configured. Missing: {detail}")
+    warnings = refresh_all() if refresh else []
     title, message = build_pushover_summary()
     send_pushover(
         cfg, title, message,
@@ -45,7 +49,9 @@ def send_digest_now() -> None:
         url="http://riskmon:8000/main",
         url_title="Open dashboard",
     )
+    record_daily_snapshot()
     store.update(notify_last_sent=dt.datetime.utcnow().isoformat())
+    return warnings
 
 
 def start() -> None:

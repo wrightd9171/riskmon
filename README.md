@@ -28,9 +28,9 @@ Three views + a weekly Pushover digest, one server, one master password.
 
 ### `/settings` → Notify — Portfolio digest (Pushover)
 - Optional push notification summarizing the portfolio, delivered to your phone via [Pushover](https://pushover.net)
-- Digest contents: total market value, unrealized P&L, virtual BTC exposure, bitcoin-loan LTV, and the top 5 positions by market value (trimmed to Pushover's 1024-char limit)
+- Digest contents: total market value, **day-over-day P&L** (vs the previous run), unrealized P&L, virtual BTC exposure, bitcoin-loan LTV, and the top 5 positions by market value — HTML-formatted with color-coded gains/losses and a tap-through dashboard link (trimmed to Pushover's 1024-char limit)
 - **Send test push now** button to verify the keys before scheduling
-- The recurring send is run by an external Windows Task Scheduler job (`send_digest.py`), so it fires even when the app is closed — see the digest setup section
+- The recurring send is run by an external Windows Task Scheduler job (`send_digest.py`), so it fires even when the app is closed. Each run refreshes prices first, so a daily cadence keeps the day-over-day P&L meaningful — see the digest setup section
 
 ## Data sources
 
@@ -142,7 +142,7 @@ The digest is optional — a low-effort "how is everything doing" push to your p
 powershell -ExecutionPolicy Bypass -File scripts\register-notify-task.ps1
 ```
 
-It prompts for the day/time and your master password, then registers a weekly Windows Task Scheduler job that runs `send_digest.py` on that cadence.
+It prompts for the days/time (default **weekdays at 09:00**; also accepts `daily` or a comma list) and your master password, then registers a Windows Task Scheduler job that runs `send_digest.py` on that cadence. Each run **refreshes prices first** (syncs every connected source) so the day-over-day P&L reflects the latest market values — which is why a daily cadence makes the P&L meaningful.
 
 **Security tradeoff:** because the task decrypts your Pushover keys unattended, it must hold your master password. The script stores it in `%LOCALAPPDATA%\riskmon\notify-password.txt` — outside OneDrive and the repo, locked to your user account — and points the task at it via `RISKMON_MASTER_PASSWORD_FILE`. This is inherent to sending on a schedule without the app open and unlocked; if you'd rather not store the password, skip the task and use the **Send test push now** button manually.
 
