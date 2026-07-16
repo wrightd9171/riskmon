@@ -268,20 +268,35 @@ def build_pushover_summary() -> tuple[str, str]:
 
     now = dt.datetime.now()
     title = f"Risk Monitor — ${_plain(total_mv)}"
+
+    def _signed(v):
+        """Colored, signed dollar amount using Pushover's <font> HTML."""
+        if v is None:
+            return "—"
+        color = "#16a34a" if v >= 0 else "#dc2626"
+        sign = "+" if v >= 0 else "-"
+        return f'<font color="{color}">{sign}${_plain(abs(v))}</font>'
+
     lines = [
-        f"{now.strftime('%b %d, %Y')} portfolio",
-        f"Total value: ${_plain(total_mv)}",
-        f"Unrealized P&L: ${_plain(total_pnl)}",
-        f"Virtual BTC: {virtual_btc:,.4f}" + (f" (BTC ${_plain(btc_price)})" if btc_price else ""),
+        f"<b>{now.strftime('%A, %b %d, %Y')}</b>",
+        f"<b>Total value:</b> ${_plain(total_mv)}",
+        f"<b>Unrealized P/L:</b> {_signed(total_pnl)}",
+        f"<b>Virtual BTC:</b> {virtual_btc:,.4f}"
+        + (f' <font color="#64748b">(BTC ${_plain(btc_price)})</font>' if btc_price else ""),
     ]
     if loan_count:
-        ltv_str = f"{ltv * 100:.1f}%" if ltv is not None else "—"
-        lines.append(f"Loans: {loan_count} · LTV {ltv_str}")
+        if ltv is None:
+            ltv_str = "—"
+        else:
+            ltv_str = f"{ltv * 100:.1f}%"
+            if ltv >= 0.7:  # flag an elevated loan-to-value in red
+                ltv_str = f'<font color="#dc2626">{ltv_str}</font>'
+        lines.append(f"<b>Loans:</b> {loan_count} · LTV {ltv_str}")
     lines.append("")
-    lines.append("Top positions:")
+    lines.append("<b>Top positions</b>")
     for s in symbols[:5]:
         pnl = (s["market_value"] - s["cost_basis_value"]) if s["has_basis"] else None
-        pnl_str = f" (P&L ${_plain(pnl)})" if pnl is not None else ""
-        lines.append(f"• {s['symbol']}: ${_plain(s['market_value'])}{pnl_str}")
+        pnl_str = f"  {_signed(pnl)}" if pnl is not None else ""
+        lines.append(f"{s['symbol']}  ${_plain(s['market_value'])}{pnl_str}")
 
     return title, "\n".join(lines)[:1024]

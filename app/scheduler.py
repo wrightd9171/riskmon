@@ -39,7 +39,12 @@ def send_digest_now() -> None:
         detail = ", ".join(_missing_fields()) or "unknown"
         raise RuntimeError(f"Pushover is not fully configured. Missing: {detail}")
     title, message = build_pushover_summary()
-    send_pushover(cfg, title, message)
+    send_pushover(
+        cfg, title, message,
+        html=True,
+        url="http://riskmon:8000/main",
+        url_title="Open dashboard",
+    )
     store.update(notify_last_sent=dt.datetime.utcnow().isoformat())
 
 

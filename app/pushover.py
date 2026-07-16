@@ -13,8 +13,20 @@ def pushover_configured(cfg: dict) -> bool:
     return all((cfg.get(k) or "").strip() for k in REQUIRED)
 
 
-def send_pushover(cfg: dict, title: str, message: str) -> None:
-    """Send a Pushover push. Raises RuntimeError with a helpful hint on failure."""
+def send_pushover(
+    cfg: dict,
+    title: str,
+    message: str,
+    html: bool = False,
+    url: str | None = None,
+    url_title: str | None = None,
+) -> None:
+    """Send a Pushover push. Raises RuntimeError with a helpful hint on failure.
+
+    Pushover supports a small HTML subset in the message when html=True:
+    <b>, <i>, <u>, <font color="#rrggbb">, and <a href>. `url`/`url_title`
+    render as a tappable supplementary link below the message.
+    """
     token = (cfg.get("pushover_token") or "").strip()
     user = (cfg.get("pushover_user_key") or "").strip()
     if not token or not user:
@@ -26,6 +38,12 @@ def send_pushover(cfg: dict, title: str, message: str) -> None:
         "title": title[:TITLE_MAX],
         "message": message[:MESSAGE_MAX],
     }
+    if html:
+        payload["html"] = "1"
+    if url:
+        payload["url"] = url[:512]
+    if url_title:
+        payload["url_title"] = url_title[:100]
     try:
         with httpx.Client(timeout=30) as client:
             resp = client.post(API_URL, data=payload)
