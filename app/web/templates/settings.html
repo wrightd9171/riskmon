@@ -31,7 +31,7 @@
     {% with addresses=onchain.addresses %}{% include "settings/_onchain.html" %}{% endwith %}
   </section>
   <section class="settings-panel" data-panel="notify">
-    {% with enabled=notify.enabled, email_to=notify.email_to, email_from=notify.email_from, smtp_host=notify.smtp_host, smtp_port=notify.smtp_port, smtp_user=notify.smtp_user, smtp_password_set=notify.smtp_password_set, days_of_week=notify.days_of_week, dow=notify.dow, hour=notify.hour, minute=notify.minute, last_sent=notify.last_sent, error=notify.error, message=notify.message %}{% include "settings/_notify.html" %}{% endwith %}
+    {% with enabled=notify.enabled, token_set=notify.token_set, user_set=notify.user_set, last_sent=notify.last_sent, error=notify.error, message=notify.message %}{% include "settings/_notify.html" %}{% endwith %}
   </section>
 </div>
 

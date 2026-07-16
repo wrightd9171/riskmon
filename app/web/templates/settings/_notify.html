@@ -1,53 +1,34 @@
-<h3>Weekly email digest</h3>
+<h3>Portfolio digest (Pushover)</h3>
 
-<p>Schedule a weekly HTML email summarizing your portfolio, virtual BTC exposure, and loan LTV. Uses standard SMTP — you provide the mailbox.</p>
+<p>Push a portfolio summary to your phone via <a href="https://pushover.net" target="_blank">Pushover</a>. Configure your keys here; the scheduled send is run by a separate Windows task (below) so it fires even when this app is closed.</p>
 
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 {% if message %}<p class="hint">{{ message }}</p>{% endif %}
 
 <form method="post" action="/notify">
   <fieldset>
-    <legend>Delivery</legend>
-    <label><input type="checkbox" name="enabled" value="1" {% if enabled %}checked{% endif %}> Enable weekly email</label>
-    <label>Send to<input type="email" name="email_to" value="{{ email_to }}" required></label>
-    <label>From (defaults to SMTP user)<input type="email" name="email_from" value="{{ email_from }}"></label>
-  </fieldset>
-
-  <fieldset>
-    <legend>SMTP account</legend>
-    <p class="hint">For Yahoo/Gmail, use a 16-character <strong>app password</strong>, not your login password. Yahoo host: <code>smtp.mail.yahoo.com</code> port <code>465</code>. Gmail: <code>smtp.gmail.com</code> port <code>465</code>. Outlook: <code>smtp-mail.outlook.com</code> port <code>587</code>.</p>
-    <label>SMTP host<input type="text" name="smtp_host" value="{{ smtp_host }}" required></label>
-    <label>Port<input type="number" name="smtp_port" value="{{ smtp_port }}" required></label>
-    <label>SMTP user (usually your email)<input type="text" name="smtp_user" value="{{ smtp_user }}" required></label>
-    <label>App password
-      <input type="password" name="smtp_password" placeholder="{{ '(leave blank to keep existing)' if smtp_password_set else '16 characters, no spaces' }}">
+    <legend>Pushover credentials</legend>
+    <p class="hint">Both are encrypted with your master password. From your Pushover dashboard: the <strong>user key</strong> is on the main page; create an <strong>application API token</strong> under "Create an Application/API Token".</p>
+    <label><input type="checkbox" name="enabled" value="1" {% if enabled %}checked{% endif %}> Enable the digest</label>
+    <label>API token
+      <input type="password" name="pushover_token" placeholder="{{ '(leave blank to keep existing)' if token_set else 'application API token' }}">
+    </label>
+    <label>User key
+      <input type="password" name="pushover_user_key" placeholder="{{ '(leave blank to keep existing)' if user_set else 'your Pushover user key' }}">
     </label>
   </fieldset>
-
-  <fieldset>
-    <legend>Schedule</legend>
-    <label>Day
-      <select name="dow">
-        {% for i, name in days_of_week %}
-          <option value="{{ i }}" {% if i == dow %}selected{% endif %}>{{ name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>Hour (0–23, local time)<input type="number" name="hour" min="0" max="23" value="{{ hour }}" required></label>
-    <label>Minute (0–59)<input type="number" name="minute" min="0" max="59" value="{{ minute }}" required></label>
-  </fieldset>
-
-  <button type="submit">Save settings</button>
+  <button type="submit">Save</button>
 </form>
 
 <form method="post" action="/notify/test" style="margin-top:16px">
-  <button type="submit">Send test email now</button>
+  <button type="submit">Send test push now</button>
 </form>
 
 <p class="hint" style="margin-top:16px">
   {% if last_sent %}Last digest sent: <code>{{ last_sent }}</code> (UTC){% else %}No digest sent yet.{% endif %}
 </p>
 
-<p class="hint">
-  The scheduler runs inside this app; the digest sends only if the store is <strong>unlocked</strong> at the target time. Leave the app running and unlocked, or manually send at any time with the button above.
-</p>
+<h4 style="margin-top:24px">Scheduling (external Windows task)</h4>
+<p class="hint">The recurring send is driven by Windows Task Scheduler, not this app, so it runs even when the app is closed. Register it once from the project root:</p>
+<pre class="cmd"><code>powershell -ExecutionPolicy Bypass -File scripts\register-notify-task.ps1</code></pre>
+<p class="hint">It prompts for your master password and the day/time, then creates a task that runs <code>send_digest.py</code> on that cadence. Because the task must decrypt these keys without you present, it has to hold your master password — see the README for the exact mechanism and the security tradeoff.</p>

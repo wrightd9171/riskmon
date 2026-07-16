@@ -98,6 +98,9 @@ table.positions th a:hover { text-decoration: underline; }
 .settings-tabs a { cursor: pointer; }
 .settings-panel[hidden] { display: none; }
 .settings-panels { padding-top: 4px; }
+pre.cmd { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 6px;
+          overflow-x: auto; font-size: 13px; margin: 8px 0; }
+pre.cmd code { color: inherit; }
 
 table.positions tr td.pnl-pos { background: #dcfce7 !important; color: #166534 !important; }
 table.positions tr td.pnl-neg { background: #fee2e2 !important; color: #991b1b !important; }

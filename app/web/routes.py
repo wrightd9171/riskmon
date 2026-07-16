@@ -220,16 +220,8 @@ def _settings_full_ctx(request: Request, overrides: dict | None = None) -> dict:
         "onchain": {"addresses": addresses},
         "notify": {
             "enabled": bool(store.get("notify_enabled")),
-            "smtp_host": store.get("notify_smtp_host") or "smtp.mail.yahoo.com",
-            "smtp_port": store.get("notify_smtp_port") or 465,
-            "smtp_user": store.get("notify_smtp_user") or "",
-            "smtp_password_set": bool(store.get("notify_smtp_password")),
-            "email_from": store.get("notify_email_from") or "",
-            "email_to": store.get("notify_email_to") or "",
-            "dow": int(store.get("notify_dow", 6)),
-            "hour": int(store.get("notify_hour", 8)),
-            "minute": int(store.get("notify_minute", 0)),
-            "days_of_week": list(enumerate(DAYS_OF_WEEK)),
+            "token_set": bool(store.get("pushover_token")),
+            "user_set": bool(store.get("pushover_user_key")),
             "last_sent": store.get("notify_last_sent") or "",
             "error": None, "message": None,
         },
@@ -741,32 +733,17 @@ def notify_get(request: Request):
 def notify_post(
     request: Request,
     enabled: str = Form(""),
-    smtp_host: str = Form(...),
-    smtp_port: int = Form(465),
-    smtp_user: str = Form(...),
-    smtp_password: str = Form(""),
-    email_from: str = Form(""),
-    email_to: str = Form(...),
-    dow: int = Form(6),
-    hour: int = Form(8),
-    minute: int = Form(0),
+    pushover_token: str = Form(""),
+    pushover_user_key: str = Form(""),
 ):
     gate = _gate(request)
     if gate:
         return gate
-    updates = {
-        "notify_enabled": bool(enabled),
-        "notify_smtp_host": smtp_host.strip(),
-        "notify_smtp_port": int(smtp_port),
-        "notify_smtp_user": smtp_user.strip(),
-        "notify_email_from": email_from.strip(),
-        "notify_email_to": email_to.strip(),
-        "notify_dow": int(dow),
-        "notify_hour": int(hour),
-        "notify_minute": int(minute),
-    }
-    if smtp_password.strip():
-        updates["notify_smtp_password"] = smtp_password
+    updates = {"notify_enabled": bool(enabled)}
+    if pushover_token.strip():
+        updates["pushover_token"] = pushover_token.strip()
+    if pushover_user_key.strip():
+        updates["pushover_user_key"] = pushover_user_key.strip()
     store.update(**updates)
     return RedirectResponse("/settings?tab=notify", status_code=303)
 

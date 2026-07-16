@@ -214,3 +214,74 @@ def build_digest() -> tuple[str, str, str]:
 </body></html>"""
 
     return subject, plain, html
+
+
+def _plain(v, decimals=0):
+    if v is None:
+        return "—"
+    return f"{v:,.{decimals}f}"
+
+
+def build_pushover_summary() -> tuple[str, str]:
+    """Return (title, message) — a compact push summary that fits Pushover's
+    1024-char message limit. Same underlying figures as the full digest."""
+    with SessionLocal() as session:
+        rows = session.execute(select(Position)).scalars().all()
+        agg: dict[str, dict] = defaultdict(lambda: {
+            "symbol": "", "quantity": 0.0, "market_value": 0.0,
+            "cost_basis_value": 0.0, "has_basis": False,
+        })
+        for pos in rows:
+            a = agg[pos.symbol]
+            a["symbol"] = pos.symbol
+            a["quantity"] += pos.quantity or 0
+            a["market_value"] += pos.market_value or 0
+            if pos.cost_basis_value is not None:
+                a["cost_basis_value"] += pos.cost_basis_value
+                a["has_basis"] = True
+
+        symbols = [s for s in agg.values() if round(s["market_value"] or 0) != 0]
+        symbols.sort(key=lambda x: -(x["market_value"] or 0))
+        total_mv = sum(s["market_value"] for s in symbols)
+        total_pnl = sum(
+            s["market_value"] - s["cost_basis_value"] for s in symbols if s["has_basis"]
+        )
+        btc_price = _current_btc_price(session)
+
+        loans = session.execute(select(BitcoinLoan)).scalars().all()
+        loan_count = len(loans)
+        ltv = None
+        net_btc = None
+        if loans:
+            total_debt = sum((l.outstanding_principal or 0) + (l.interest_accrued or 0) for l in loans)
+            total_collateral = sum(l.collateral_btc or 0 for l in loans)
+            collateral_value = total_collateral * btc_price if btc_price else None
+            ltv = total_debt / collateral_value if collateral_value else None
+            debt_btc = total_debt / btc_price if btc_price else None
+            net_btc = total_collateral - debt_btc if debt_btc is not None else None
+
+        btc_total = sum(s["quantity"] for s in symbols if s["symbol"] == "BTC")
+        ibit_mv = sum(s["market_value"] for s in symbols if s["symbol"] == "IBIT")
+        virtual_btc = btc_total + (ibit_mv / btc_price if btc_price else 0)
+        if net_btc is not None:
+            virtual_btc += net_btc
+
+    now = dt.datetime.now()
+    title = f"Risk Monitor — ${_plain(total_mv)}"
+    lines = [
+        f"{now.strftime('%b %d, %Y')} portfolio",
+        f"Total value: ${_plain(total_mv)}",
+        f"Unrealized P&L: ${_plain(total_pnl)}",
+        f"Virtual BTC: {virtual_btc:,.4f}" + (f" (BTC ${_plain(btc_price)})" if btc_price else ""),
+    ]
+    if loan_count:
+        ltv_str = f"{ltv * 100:.1f}%" if ltv is not None else "—"
+        lines.append(f"Loans: {loan_count} · LTV {ltv_str}")
+    lines.append("")
+    lines.append("Top positions:")
+    for s in symbols[:5]:
+        pnl = (s["market_value"] - s["cost_basis_value"]) if s["has_basis"] else None
+        pnl_str = f" (P&L ${_plain(pnl)})" if pnl is not None else ""
+        lines.append(f"• {s['symbol']}: ${_plain(s['market_value'])}{pnl_str}")
+
+    return title, "\n".join(lines)[:1024]
