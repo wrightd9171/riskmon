@@ -31,6 +31,13 @@
   </form>
 </section>
 
+{% if accounts %}
+<p class="freshness">
+  <span class="hint">Data as of last sync (not live quotes):</span>
+  {% for a in accounts %}<span class="src {{ a.synced | age_level }}">{{ a.label }} · {{ a.synced | ago }}</span>{% endfor %}
+</p>
+{% endif %}
+
 {% macro sort_arrow(col) -%}
   {%- if sort_by == col -%}
     <span class="sort-arrow">{{ "↑" if sort_dir == "asc" else "↓" }}</span>

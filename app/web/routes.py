@@ -63,11 +63,39 @@ def _price(value) -> str:
     return f"{value:,.2f}"
 
 
+def _ago(value) -> str:
+    """Relative age of a UTC datetime, e.g. 'just now', '4m ago', '6h ago', '5d ago'."""
+    if value is None:
+        return "never synced"
+    secs = max(0.0, (dt.datetime.utcnow() - value).total_seconds())
+    if secs < 90:
+        return "just now"
+    if secs < 90 * 60:
+        return f"{int(round(secs / 60))}m ago"
+    if secs < 36 * 3600:
+        return f"{int(round(secs / 3600))}h ago"
+    return f"{int(round(secs / 86400))}d ago"
+
+
+def _age_level(value) -> str:
+    """Bucket for coloring: fresh (<1d), warn (<1w), old (older or never)."""
+    if value is None:
+        return "old"
+    hrs = (dt.datetime.utcnow() - value).total_seconds() / 3600
+    if hrs < 24:
+        return "fresh"
+    if hrs < 24 * 7:
+        return "warn"
+    return "old"
+
+
 TEMPLATES.env.filters["num"] = _num
 TEMPLATES.env.filters["qty"] = _qty
 TEMPLATES.env.filters["btc"] = _btc
 TEMPLATES.env.filters["qty_btc"] = _qty_btc
 TEMPLATES.env.filters["price"] = _price
+TEMPLATES.env.filters["ago"] = _ago
+TEMPLATES.env.filters["age_level"] = _age_level
 
 router = APIRouter()
 

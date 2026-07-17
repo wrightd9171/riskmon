@@ -60,6 +60,14 @@ hr { border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0; }
 .filter { margin-bottom: 16px; }
 .filter-actions { margin-top: 10px; }
 
+.freshness { margin: 0 0 14px; line-height: 2; }
+.freshness .src { display: inline-block; padding: 1px 8px; margin: 2px 6px 2px 0;
+                  border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px;
+                  background: #f8fafc; color: #475569; white-space: nowrap; }
+.freshness .src.warn { color: #b45309; border-color: #fcd34d; background: #fffbeb; }
+.freshness .src.old { color: #b91c1c; border-color: #fca5a5; background: #fef2f2;
+                      font-weight: 600; }
+
 details.acct-filter { display: inline-block; position: relative; vertical-align: middle; }
 details.acct-filter > summary { cursor: pointer; list-style: none; user-select: none;
     padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; }
