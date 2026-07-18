@@ -8,7 +8,7 @@
 <p class="hint">Each refresh tries the login first and falls back to the CSV if it can't complete (library not installed, 2FA it can't satisfy, etc.). The API gives live quantities and prices; <strong>cost basis is merged in from your latest CSV</strong> (average cost/share × current shares), so keep a recent CSV in <code>data/</code> for accurate Fidelity P&L.</p>
 
 <h4>Automated login (fidelity-api)</h4>
-<p class="hint">One-time install on this machine: <code>pip install fidelity-api</code> then <code>playwright install</code>. Credentials are encrypted with your master password. The optional TOTP secret lets it clear authenticator-app 2FA unattended — required for the scheduled/daily runs, since those can't prompt you for a code.</p>
+<p class="hint">One-time install on this machine: <code>pip install fidelity-api</code> then <code>playwright install firefox</code>. Credentials are encrypted with your master password. The optional TOTP secret lets it clear authenticator-app 2FA unattended — required for the scheduled/daily runs, since those can't prompt you for a code.</p>
 
 {% if username %}
   <p>Configured for user <code>{{ username }}</code>{% if not password_set %} <span class="error">(password not set)</span>{% endif %}{% if totp_set %} · TOTP secret set{% endif %}.

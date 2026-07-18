@@ -95,7 +95,7 @@ Fidelity has no official API. The app pulls positions two ways and, on each refr
 **Option A — automated login (`fidelity-api`).** Drives a real browser (Playwright) to scrape your positions. Unofficial and fragile, with a one-time install:
 
     pip install fidelity-api
-    playwright install
+    playwright install firefox
 
 Then on `/settings` → **Fidelity**, enter your Fidelity username and password (encrypted with your master password). Two ways to get past 2FA on the headless refresh:
 

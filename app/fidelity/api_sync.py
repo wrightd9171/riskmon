@@ -8,7 +8,7 @@ installed.
 
 Setup for the user (one time):
     pip install fidelity-api
-    playwright install
+    playwright install firefox
 Then enter the Fidelity username/password (and optional TOTP secret) on the
 Settings -> Fidelity tab.
 """
@@ -89,7 +89,7 @@ def sync_via_api() -> dict:
         from fidelity import fidelity as fidelity_lib
     except Exception as exc:  # not installed / import error
         raise FidelityApiUnavailable(
-            f"fidelity-api not available ({exc}); run `pip install fidelity-api` and `playwright install`"
+            f"fidelity-api not available ({exc}); run `pip install fidelity-api` and `playwright install firefox`"
         ) from exc
 
     browser = None
