@@ -1,0 +1,3 @@
+# Batch files must use CRLF, or cmd.exe mishandles goto/labels and if-blocks.
+*.cmd text eol=crlf
+*.bat text eol=crlf
