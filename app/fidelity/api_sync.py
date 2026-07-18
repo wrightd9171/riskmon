@@ -38,6 +38,40 @@ def _to_float(value):
         return None
 
 
+def _csv_cost_basis() -> tuple[dict, dict]:
+    """The API omits cost basis, so read average cost/share from the latest
+    Fidelity CSV. Returns (by_account_symbol, by_symbol) -> avg cost per share."""
+    from . import sync as csv_sync
+
+    path = csv_sync.find_csv()
+    if path is None:
+        return {}, {}
+    import csv as _csv
+
+    by_acct: dict[tuple[str, str], float] = {}
+    by_symbol: dict[str, float] = {}
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as fh:
+            for row in _csv.DictReader(fh):
+                symbol = csv_sync._clean_symbol(row.get("Symbol"))
+                if not symbol:
+                    continue
+                cbp = csv_sync._parse_money(row.get("Average cost basis"))
+                if cbp is None:  # derive per-share from total / quantity if blank
+                    cbv = csv_sync._parse_money(row.get("Cost basis total"))
+                    qty = csv_sync._parse_qty(row.get("Quantity"))
+                    cbp = (cbv / qty) if (cbv is not None and qty) else None
+                if cbp is None:
+                    continue
+                acct_num = (row.get("Account number") or "").strip()
+                if acct_num:
+                    by_acct[(acct_num, symbol)] = cbp
+                by_symbol.setdefault(symbol, cbp)
+    except OSError:
+        return {}, {}
+    return by_acct, by_symbol
+
+
 def sync_via_api() -> dict:
     username = (store.get("fidelity_username") or "").strip()
     password = (store.get("fidelity_password") or "").strip()
@@ -85,6 +119,8 @@ def sync_via_api() -> dict:
         raise FidelityApiUnavailable("Fidelity API returned no accounts")
 
     now = dt.datetime.utcnow()
+    cb_by_acct, cb_by_symbol = _csv_cost_basis()
+    method = "Fidelity API (CSV basis)" if (cb_by_acct or cb_by_symbol) else "Fidelity API"
     positions_seen = 0
     accounts_seen = 0
     with SessionLocal() as session:
@@ -117,6 +153,12 @@ def sync_via_api() -> dict:
                 qty = _to_float(stock.get("quantity"))
                 if not ticker or qty is None:
                     continue
+                # Cost basis is merged from the latest CSV (the API omits it):
+                # average cost/share, preferring an exact account+symbol match,
+                # applied to the current API quantity.
+                cbp = cb_by_acct.get((acct_num, ticker))
+                if cbp is None:
+                    cbp = cb_by_symbol.get(ticker)
                 session.add(Position(
                     account_id=account.id,
                     symbol=ticker,
@@ -125,19 +167,19 @@ def sync_via_api() -> dict:
                     quantity=qty,
                     market_value=_to_float(stock.get("value")),
                     last_price=_to_float(stock.get("last_price")),
-                    cost_basis_price=None,   # the API does not expose cost basis
-                    cost_basis_value=None,
+                    cost_basis_price=cbp,
+                    cost_basis_value=(cbp * qty) if cbp is not None else None,
                 ))
                 positions_seen += 1
 
             account.last_synced_at = now
-            account.sync_method = "Fidelity API"
+            account.sync_method = method
             accounts_seen += 1
         session.commit()
 
     return {
         "positions": positions_seen,
         "accounts": accounts_seen,
-        "method": "Fidelity API",
+        "method": method,
         "synced_at": now,
     }

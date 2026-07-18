@@ -97,7 +97,7 @@ Fidelity has no official API. The app pulls positions two ways and, on each refr
     pip install fidelity-api
     playwright install
 
-Then on `/settings` → **Fidelity**, enter your Fidelity username and password (encrypted with your master password). For unattended runs (the scheduled digest), also add an authenticator **TOTP secret** so it can clear 2FA without prompting — otherwise a 2FA challenge just makes it fall back to CSV. Caveat: the API path does **not** include cost basis (so no P&L on Fidelity positions) and can break when Fidelity changes their site.
+Then on `/settings` → **Fidelity**, enter your Fidelity username and password (encrypted with your master password). For unattended runs (the scheduled digest), also add an authenticator **TOTP secret** so it can clear 2FA without prompting — otherwise a 2FA challenge just makes it fall back to CSV. The API only returns live quantities/prices, so **cost basis is merged in from your latest CSV** (average cost/share × current shares) — keep a recent `Fidelity_*.csv` in `data/` for accurate Fidelity P&L. Caveat: it's unofficial and can break when Fidelity changes their site.
 
 **Option B — CSV import** (reliable, includes cost basis):
 
