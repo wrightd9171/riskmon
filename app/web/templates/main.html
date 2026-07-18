@@ -34,7 +34,7 @@
 {% if accounts %}
 <p class="freshness">
   <span class="hint">Data as of last sync (not live quotes):</span>
-  {% for a in accounts %}<span class="src {{ a.synced | age_level }}">{{ a.label }} · {{ a.synced | ago }}</span>{% endfor %}
+  {% for a in accounts %}<span class="src {{ a.synced | age_level }}">{{ a.label }} · {{ a.synced | ago }} · via {{ a.method }}</span>{% endfor %}
 </p>
 {% endif %}
 

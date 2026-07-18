@@ -129,13 +129,29 @@ def _account_label(account: Account) -> str:
     return " ".join(parts)
 
 
+BROKER_METHOD = {
+    "schwab": "Schwab API (OAuth)",
+    "coinbase": "Coinbase API",
+    "robinhood": "Robinhood API",
+    "strike": "Strike API",
+    "onchain": "mempool.space",
+    "fidelity": "Fidelity",
+}
+
+
+def _sync_method(account: Account) -> str:
+    """How the account's data was last obtained. Fidelity records the actual
+    path (API vs CSV); the others always come from their own API."""
+    return account.sync_method or BROKER_METHOD.get(account.broker) or account.broker
+
+
 def _any_broker_configured() -> bool:
     return bool(
         store.get("refresh_token")
         or store.get("coinbase_key_name")
         or store.get("robinhood_api_key")
         or store.get("strike_api_key")
-        or fidelity_sync.has_csv()
+        or fidelity_sync.available()
         or onchain_sync.has_addresses()
     )
 
@@ -244,7 +260,12 @@ def _settings_full_ctx(request: Request, overrides: dict | None = None) -> dict:
                       "public_key": store.get("robinhood_public_key") or "",
                       "api_key": "", "error": None, "message": None},
         "strike": {"connected": bool(store.get("strike_api_key")), "error": None},
-        "fidelity": {"csv": csv.name if csv else None},
+        "fidelity": {
+            "csv": csv.name if csv else None,
+            "username": store.get("fidelity_username") or "",
+            "password_set": bool(store.get("fidelity_password")),
+            "totp_set": bool(store.get("fidelity_totp_secret")),
+        },
         "onchain": {"addresses": addresses},
         "notify": {
             "enabled": bool(store.get("notify_enabled")),
@@ -287,6 +308,36 @@ def fidelity_get(request: Request):
     gate = _gate(request)
     if gate:
         return gate
+    return RedirectResponse("/settings?tab=fidelity", status_code=303)
+
+
+@router.post("/fidelity")
+def fidelity_post(
+    request: Request,
+    fidelity_username: str = Form(""),
+    fidelity_password: str = Form(""),
+    fidelity_totp_secret: str = Form(""),
+):
+    gate = _gate(request)
+    if gate:
+        return gate
+    updates = {}
+    if fidelity_username.strip():
+        updates["fidelity_username"] = fidelity_username.strip()
+    if fidelity_password.strip():
+        updates["fidelity_password"] = fidelity_password.strip()
+    if fidelity_totp_secret.strip():
+        updates["fidelity_totp_secret"] = fidelity_totp_secret.strip()
+    if updates:
+        store.update(**updates)
+    return RedirectResponse("/settings?tab=fidelity", status_code=303)
+
+
+@router.post("/fidelity/disconnect")
+def fidelity_disconnect():
+    if not store.is_unlocked():
+        return RedirectResponse("/unlock", status_code=303)
+    store.update(fidelity_username=None, fidelity_password=None, fidelity_totp_secret=None)
     return RedirectResponse("/settings?tab=fidelity", status_code=303)
 
 
@@ -515,7 +566,8 @@ def main_view(
             "clear_url": clear_url,
             "symbols": symbols,
             "accounts": [
-                {"id": a.id, "label": _account_label(a), "synced": a.last_synced_at}
+                {"id": a.id, "label": _account_label(a), "synced": a.last_synced_at,
+                 "method": _sync_method(a)}
                 for a in all_accounts
             ],
             "selected_ids": selected_ids,
@@ -573,11 +625,11 @@ def refresh_post():
         except httpx.HTTPStatusError as exc:
             errors.append(f"Strike sync failed: {exc}")
 
-    if fidelity_sync.has_csv():
+    if fidelity_sync.available():
         try:
             fidelity_sync.sync_all()
         except Exception as exc:
-            errors.append(f"Fidelity CSV import failed: {exc}")
+            errors.append(f"Fidelity sync failed: {exc}")
 
     if onchain_sync.has_addresses():
         try:

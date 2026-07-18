@@ -9,7 +9,8 @@ Three views + a weekly Pushover digest, one server, one master password.
 ### `/main` — Positions
 - Every position from every connected account, aggregated per symbol, with per-account drill-down beneath each aggregate row
 - Sortable columns: Symbol, Description, Last Price, Quantity, Market Value, Cost Basis Price, Cost Basis Value, Unrealized P&L
-- Filters: by account (checkboxes), hide zero-value positions, hide positions with no cost-basis P&L
+- Filters: by account (auto-applying dropdown), hide zero-value positions, hide positions with no cost-basis P&L
+- Data-freshness line: for every account, when it was last synced and **how** (e.g. `Schwab API (OAuth)`, `Fidelity API`, `Fidelity CSV`, `mempool.space`), color-coded by age. Prices are last-sync values, not live quotes
 - Unrealized P&L color-coded (green positive, red negative)
 - Total row at top summing Market Value, Cost Basis Value, and Unrealized P&L
 - Prices ≥ $1,000 render with 0 decimals, smaller prices with 2; BTC quantity to 2 decimals, other quantities rounded to whole units
@@ -87,9 +88,18 @@ The app auto-detects both older PEM-wrapped EC keys (signed as ES256) and newer 
 
 Loans are **not** exposed by the Strike API — enter them by hand on `/loans`.
 
-### Fidelity (CSV import)
+### Fidelity (automated login or CSV import)
 
-Fidelity has no public API — the app reads a downloaded positions CSV.
+Fidelity has no official API. The app pulls positions two ways and, on each refresh, **tries the automated login first, then falls back to the CSV** if it can't complete. Set up either or both on `/settings` → **Fidelity**.
+
+**Option A — automated login (`fidelity-api`).** Drives a real browser (Playwright) to scrape your positions. Unofficial and fragile, with a one-time install:
+
+    pip install fidelity-api
+    playwright install
+
+Then on `/settings` → **Fidelity**, enter your Fidelity username and password (encrypted with your master password). For unattended runs (the scheduled digest), also add an authenticator **TOTP secret** so it can clear 2FA without prompting — otherwise a 2FA challenge just makes it fall back to CSV. Caveat: the API path does **not** include cost basis (so no P&L on Fidelity positions) and can break when Fidelity changes their site.
+
+**Option B — CSV import** (reliable, includes cost basis):
 
 1. Sign in at [fidelity.com](https://fidelity.com)
 2. Go to **Accounts & Trade** → **Portfolio**

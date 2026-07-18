@@ -1,5 +1,33 @@
 <h3>Fidelity</h3>
-<p>Fidelity has no public API. Export your positions from fidelity.com (<em>Positions → Download</em>) and drop the CSV into <code>data/</code> — any filename starting with <code>Fidelity_</code>. Refresh will pick it up.</p>
+
+<p>Fidelity has no official API. This app pulls positions two ways, in order:</p>
+<ol>
+  <li><strong>Automated login</strong> (optional) via the <code>fidelity-api</code> browser scraper — configure it below.</li>
+  <li><strong>CSV fallback</strong> — export from fidelity.com and drop the file in <code>data/</code>.</li>
+</ol>
+<p class="hint">Each refresh tries the login first and falls back to the CSV if it can't complete (library not installed, 2FA it can't satisfy, etc.). The API path does <strong>not</strong> include cost basis; the CSV does.</p>
+
+<h4>Automated login (fidelity-api)</h4>
+<p class="hint">One-time install on this machine: <code>pip install fidelity-api</code> then <code>playwright install</code>. Credentials are encrypted with your master password. The optional TOTP secret lets it clear authenticator-app 2FA unattended — required for the scheduled/daily runs, since those can't prompt you for a code.</p>
+
+{% if username %}
+  <p>Configured for user <code>{{ username }}</code>{% if not password_set %} <span class="error">(password not set)</span>{% endif %}{% if totp_set %} · TOTP secret set{% endif %}.
+    <form method="post" action="/fidelity/disconnect" style="display:inline"><button type="submit" class="link">Clear login</button></form>
+  </p>
+{% endif %}
+
+<form method="post" action="/fidelity">
+  <fieldset>
+    <legend>Fidelity login</legend>
+    <label>Username<input type="text" name="fidelity_username" value="{{ username }}" autocomplete="off"></label>
+    <label>Password<input type="password" name="fidelity_password" placeholder="{{ '(leave blank to keep existing)' if password_set else '' }}"></label>
+    <label>TOTP secret (optional)<input type="password" name="fidelity_totp_secret" placeholder="{{ '(leave blank to keep existing)' if totp_set else 'base32 authenticator secret' }}"></label>
+  </fieldset>
+  <button type="submit">Save Fidelity login</button>
+</form>
+
+<h4 style="margin-top:20px">CSV fallback</h4>
+<p>Export your positions from fidelity.com (<em>Positions → Download</em>) and drop the CSV into <code>data/</code> — any filename starting with <code>Fidelity_</code>. Refresh uses it whenever the automated login isn't available.</p>
 {% if fidelity_csv %}
   <p>Latest CSV found: <code>{{ fidelity_csv }}</code></p>
 {% else %}

@@ -7,3 +7,9 @@ sqlalchemy>=2.0
 cryptography>=42.0
 argon2-cffi>=23.1
 pyjwt[crypto]>=2.8
+
+# Optional — only for the Fidelity automated login (Settings -> Fidelity).
+# After installing, also run `playwright install`. Without these the app
+# falls back to the Fidelity CSV import, so they are not required.
+fidelity-api>=0.0.16
+pyotp>=2.9

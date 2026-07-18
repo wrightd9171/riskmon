@@ -41,11 +41,11 @@ def refresh_all() -> list[str]:
         except Exception as exc:
             errors.append(f"Strike: {exc}")
 
-    if fidelity_sync.has_csv():
+    if fidelity_sync.available():
         try:
             fidelity_sync.sync_all()
         except Exception as exc:
-            errors.append(f"Fidelity CSV: {exc}")
+            errors.append(f"Fidelity: {exc}")
 
     if onchain_sync.has_addresses():
         try:

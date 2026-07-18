@@ -29,6 +29,7 @@ class Account(Base):
     account_type = Column(String)
     nickname = Column(String)
     last_synced_at = Column(DateTime)
+    sync_method = Column(String)  # how the last sync was obtained (e.g. "Fidelity CSV")
 
     positions = relationship(
         "Position", back_populates="account", cascade="all, delete-orphan"
@@ -82,3 +83,8 @@ class DailySnapshot(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    # Lightweight migration: add columns introduced after the DB was created.
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(accounts)")}
+        if "sync_method" not in cols:
+            conn.exec_driver_sql("ALTER TABLE accounts ADD COLUMN sync_method VARCHAR")

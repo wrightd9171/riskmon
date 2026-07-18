@@ -62,10 +62,37 @@ def has_csv() -> bool:
     return find_csv() is not None
 
 
+def available() -> bool:
+    """True if Fidelity can be synced at all — API creds configured or a CSV present."""
+    from .api_sync import configured
+    return configured() or has_csv()
+
+
 def sync_all() -> dict:
+    """Refresh Fidelity: try the fidelity-api scraper first, fall back to the CSV."""
+    from .api_sync import FidelityApiUnavailable, configured, sync_via_api
+
+    api_error = None
+    if configured():
+        try:
+            return sync_via_api()
+        except FidelityApiUnavailable as exc:
+            api_error = str(exc)
+
+    if has_csv():
+        result = sync_from_csv()
+        if api_error:
+            result["api_error"] = api_error
+        return result
+
+    return {"positions": 0, "accounts": 0, "csv": None,
+            "method": None, "synced_at": None, "api_error": api_error}
+
+
+def sync_from_csv() -> dict:
     csv_path = find_csv()
     if csv_path is None:
-        return {"positions": 0, "accounts": 0, "csv": None, "synced_at": None}
+        return {"positions": 0, "accounts": 0, "csv": None, "method": None, "synced_at": None}
 
     now = dt.datetime.utcnow()
     with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
@@ -147,11 +174,13 @@ def sync_all() -> dict:
 
         for account in accounts_touched.values():
             account.last_synced_at = now
+            account.sync_method = "Fidelity CSV"
         session.commit()
 
     return {
         "positions": positions_seen,
         "accounts": len(accounts_touched),
         "csv": csv_path.name,
+        "method": "Fidelity CSV",
         "synced_at": now,
     }

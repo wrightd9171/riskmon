@@ -25,7 +25,7 @@
     {% with connected=strike.connected, error=strike.error %}{% include "settings/_strike.html" %}{% endwith %}
   </section>
   <section class="settings-panel" data-panel="fidelity">
-    {% with fidelity_csv=fidelity.csv %}{% include "settings/_fidelity.html" %}{% endwith %}
+    {% with fidelity_csv=fidelity.csv, username=fidelity.username, password_set=fidelity.password_set, totp_set=fidelity.totp_set %}{% include "settings/_fidelity.html" %}{% endwith %}
   </section>
   <section class="settings-panel" data-panel="onchain">
     {% with addresses=onchain.addresses %}{% include "settings/_onchain.html" %}{% endwith %}
