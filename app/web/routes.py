@@ -145,6 +145,32 @@ def _sync_method(account: Account) -> str:
     return account.sync_method or BROKER_METHOD.get(account.broker) or account.broker
 
 
+PROVIDER_ORDER = ["schwab", "coinbase", "robinhood", "strike", "fidelity", "onchain"]
+PROVIDER_LABEL = {
+    "schwab": "Schwab", "coinbase": "Coinbase", "robinhood": "Robinhood",
+    "strike": "Strike", "fidelity": "Fidelity", "onchain": "On-chain",
+}
+
+
+def _data_sources(accounts) -> list[dict]:
+    """One freshness entry per provider for the Positions header — Fidelity's
+    sub-accounts collapse into a single 'Fidelity' entry (they sync together)."""
+    groups: dict[str, dict] = {}
+    for a in accounts:
+        g = groups.get(a.broker)
+        if g is None:
+            groups[a.broker] = {
+                "label": PROVIDER_LABEL.get(a.broker, a.broker.title()),
+                "synced": a.last_synced_at,
+                "method": _sync_method(a),
+            }
+        elif a.last_synced_at and (g["synced"] is None or a.last_synced_at > g["synced"]):
+            g["synced"] = a.last_synced_at
+    ordered = [groups[b] for b in PROVIDER_ORDER if b in groups]
+    ordered += [g for b, g in groups.items() if b not in PROVIDER_ORDER]
+    return ordered
+
+
 def _any_broker_configured() -> bool:
     return bool(
         store.get("refresh_token")
@@ -566,10 +592,10 @@ def main_view(
             "clear_url": clear_url,
             "symbols": symbols,
             "accounts": [
-                {"id": a.id, "label": _account_label(a), "synced": a.last_synced_at,
-                 "method": _sync_method(a)}
+                {"id": a.id, "label": _account_label(a), "synced": a.last_synced_at}
                 for a in all_accounts
             ],
+            "data_sources": _data_sources(all_accounts),
             "selected_ids": selected_ids,
             "sort_by": sort,
             "sort_dir": dir,

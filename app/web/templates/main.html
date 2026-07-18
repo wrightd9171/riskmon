@@ -31,10 +31,10 @@
   </form>
 </section>
 
-{% if accounts %}
+{% if data_sources %}
 <p class="freshness">
   <span class="hint">Data as of last sync (not live quotes):</span>
-  {% for a in accounts %}<span class="src {{ a.synced | age_level }}">{{ a.label }} · {{ a.synced | ago }} · via {{ a.method }}</span>{% endfor %}
+  {% for s in data_sources %}<span class="src {{ s.synced | age_level }}">{{ s.label }} · {{ s.synced | ago }} · via {{ s.method }}</span>{% endfor %}
 </p>
 {% endif %}
 
