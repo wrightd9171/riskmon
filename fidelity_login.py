@@ -26,6 +26,7 @@ def main() -> int:
 
     username = (store.get("fidelity_username") or "").strip()
     password = (store.get("fidelity_password") or "").strip()
+    totp_secret = (store.get("fidelity_totp_secret") or "").strip()
     if not username or not password:
         print("No Fidelity username/password saved — enter them on Settings -> Fidelity first.",
               file=sys.stderr)
@@ -47,28 +48,33 @@ def main() -> int:
         profile_path=str(DATA_DIR), title=SESSION_TITLE,
     )
     try:
-        # Best-effort auto-fill; an error here must NOT close the window.
+        step_1 = step_2 = None
         try:
-            step_1, step_2 = browser.login(username=username, password=password, save_device=True)
+            step_1, step_2 = browser.login(
+                username=username, password=password,
+                totp_secret=(totp_secret or None), save_device=True,
+            )
             print(f"[auto-login: credentials_submitted={step_1}, logged_in_without_2FA={step_2}]")
-            if step_2 is False:
-                code = input(
-                    "If Fidelity TEXTED you a code, type it and press Enter; "
-                    "otherwise leave blank and approve the push in the window: "
-                ).strip()
-                if code:
-                    try:
-                        browser.login_2FA(code)
-                    except Exception as exc:
-                        print(f"[login_2FA note: {exc}]")
         except Exception as exc:
-            print(f"[auto-login hit an error — just finish manually in the window: {exc}]")
+            print(f"[auto-login error: {exc}]")
 
-        # Hold the window open until the user has actually logged in.
+        if step_2 is True:
+            print("Logged in automatically.")
+        elif not totp_secret:
+            print(
+                "\nFidelity is challenging with an AUTHENTICATOR-APP code (TOTP) — the kind\n"
+                "Duo Mobile generates as a 6-digit passcode. This tool can only auto-enter it\n"
+                "if you give it the secret SEED. Best options:\n"
+                "  1) Add the TOTP secret on Settings -> Fidelity (README 'Fidelity') — then it\n"
+                "     works automatically, including the daily refresh. RECOMMENDED.\n"
+                "  2) Keep using the Fidelity CSV export — it works and includes cost basis.\n"
+                "(Finishing by hand in the window is hit-or-miss for this screen.)\n"
+            )
+
         input(
-            "\nIn the Firefox window: finish logging in and approve the Duo 2FA. If you see a\n"
-            "\"Don't ask again on this device\" / \"Remember this device\" option, CHECK it.\n"
-            "When you can see your Fidelity accounts, press Enter here to save the session... "
+            "\nTo try finishing manually anyway: complete login/2FA in the Firefox window\n"
+            "(check any 'remember this device' box), then press Enter here to save. Otherwise\n"
+            "just press Enter to exit... "
         )
 
         try:
