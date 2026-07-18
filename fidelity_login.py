@@ -1,10 +1,9 @@
 """One-time interactive Fidelity login for the Risk Monitor.
 
-Opens a real (non-headless) browser window so you can clear Fidelity's 2FA once
-— approve the Duo push on your phone, or type the texted code — then saves the
-browser session to data/Fidelity_riskmon.json with the device remembered. After
-that, the app's headless refresh reuses that session and skips 2FA, until
-Fidelity expires it (just re-run this when refreshes start falling back to CSV).
+Opens a real Firefox window so you can complete Fidelity's login + 2FA by hand
+(approve the Duo push, check any "remember this device" box). It then saves the
+browser session to data/Fidelity_riskmon.json, which the app's headless refresh
+reuses so it can skip 2FA — until Fidelity expires it (re-run this then).
 
 Run from the project root:
     .venv\\Scripts\\python.exe fidelity_login.py
@@ -35,44 +34,59 @@ def main() -> int:
     try:
         from fidelity import fidelity as fidelity_lib
     except Exception as exc:
-        print(f"fidelity-api not installed ({exc}). Run: pip install fidelity-api && playwright install",
-              file=sys.stderr)
+        print(f"fidelity-api not installed ({exc}). "
+              "Run: pip install fidelity-api && playwright install firefox", file=sys.stderr)
         return 2
 
-    print("Opening a browser window — credentials are filled automatically.")
-    print("Complete 2FA in the window (approve the Duo push, or note the code Fidelity texts you).")
+    print("Opening a Firefox window. It will TRY to fill your login automatically,")
+    print("but you may need to finish by hand. Do NOT close the window yourself —")
+    print("come back to THIS console and press Enter when you are done.\n")
+
     browser = fidelity_lib.FidelityAutomation(
         headless=False, save_state=True,
         profile_path=str(DATA_DIR), title=SESSION_TITLE,
     )
     try:
-        step_1, step_2 = browser.login(username=username, password=password, save_device=True)
-        if not step_1:
-            print("Could not submit credentials — check the username/password.", file=sys.stderr)
-            return 1
-        if not step_2:
-            code = input(
-                "Enter the code Fidelity texted you "
-                "(leave blank only if you already finished 2FA in the browser window): "
-            ).strip()
-            if code:
-                browser.login_2FA(code)
-        info = browser.getAccountInfo()
-        if info:
-            print(f"Success. Fidelity accounts found: {', '.join(str(k) for k in info.keys())}")
-        else:
-            print("Logged in, but no accounts were returned. The session was still saved.",
-                  file=sys.stderr)
-    except Exception as exc:
-        print(f"Interactive login failed: {exc}", file=sys.stderr)
-        return 1
+        # Best-effort auto-fill; an error here must NOT close the window.
+        try:
+            step_1, step_2 = browser.login(username=username, password=password, save_device=True)
+            print(f"[auto-login: credentials_submitted={step_1}, logged_in_without_2FA={step_2}]")
+            if step_2 is False:
+                code = input(
+                    "If Fidelity TEXTED you a code, type it and press Enter; "
+                    "otherwise leave blank and approve the push in the window: "
+                ).strip()
+                if code:
+                    try:
+                        browser.login_2FA(code)
+                    except Exception as exc:
+                        print(f"[login_2FA note: {exc}]")
+        except Exception as exc:
+            print(f"[auto-login hit an error — just finish manually in the window: {exc}]")
+
+        # Hold the window open until the user has actually logged in.
+        input(
+            "\nIn the Firefox window: finish logging in and approve the Duo 2FA. If you see a\n"
+            "\"Don't ask again on this device\" / \"Remember this device\" option, CHECK it.\n"
+            "When you can see your Fidelity accounts, press Enter here to save the session... "
+        )
+
+        try:
+            info = browser.getAccountInfo()
+            if info:
+                print(f"Saved. Fidelity accounts found: {', '.join(str(k) for k in info.keys())}")
+            else:
+                print("No accounts read, but the session was saved — a Refresh will show if it worked.")
+        except Exception as exc:
+            print(f"[getAccountInfo note: {exc}] — session still saved.")
     finally:
         try:
-            browser.close_browser()  # persists the session file
-        except Exception:
-            pass
+            browser.close_browser()  # persists data/Fidelity_riskmon.json
+        except Exception as exc:
+            print(f"[close/save note: {exc}]")
 
-    print(f"Session saved to {DATA_DIR}\\Fidelity_{SESSION_TITLE}.json — refreshes will reuse it.")
+    print(f"\nSession file: {DATA_DIR}\\Fidelity_{SESSION_TITLE}.json")
+    print("Now click Refresh in the app — Fidelity should sync via the API (falls back to CSV if not).")
     return 0
 
 
