@@ -97,7 +97,12 @@ Fidelity has no official API. The app pulls positions two ways and, on each refr
     pip install fidelity-api
     playwright install
 
-Then on `/settings` → **Fidelity**, enter your Fidelity username and password (encrypted with your master password). For unattended runs (the scheduled digest), also add an authenticator **TOTP secret** so it can clear 2FA without prompting — otherwise a 2FA challenge just makes it fall back to CSV. The API only returns live quantities/prices, so **cost basis is merged in from your latest CSV** (average cost/share × current shares) — keep a recent `Fidelity_*.csv` in `data/` for accurate Fidelity P&L. Caveat: it's unofficial and can break when Fidelity changes their site.
+Then on `/settings` → **Fidelity**, enter your Fidelity username and password (encrypted with your master password). Two ways to get past 2FA on the headless refresh:
+
+- **TOTP secret** — if you have a Fidelity authenticator/passcode seed, paste it in the TOTP box; the library clears 2FA automatically every run.
+- **One-time interactive login** (for Duo push, or no TOTP seed) — run `.venv\Scripts\python.exe fidelity_login.py` from the project root. It opens a browser so you approve 2FA once, then saves the session to `data/Fidelity_riskmon.json` (device remembered); later headless refreshes reuse it and skip 2FA. Re-run it when refreshes start falling back to CSV (the saved session expired).
+
+Without either, a 2FA challenge just makes the refresh fall back to CSV. The API only returns live quantities/prices, so **cost basis is merged in from your latest CSV** (average cost/share × current shares) — keep a recent `Fidelity_*.csv` in `data/` for accurate Fidelity P&L. Caveat: it's unofficial and can break when Fidelity changes their site.
 
 **Option B — CSV import** (reliable, includes cost basis):
 

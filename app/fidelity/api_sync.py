@@ -16,8 +16,14 @@ import datetime as dt
 
 from sqlalchemy import select
 
+from ..config import DATA_DIR
 from ..db import Account, Position, SessionLocal
 from ..secrets_store import store
+
+# Shared browser-session file: data/Fidelity_riskmon.json. The interactive login
+# (fidelity_login.py) and the headless refresh both pin to this so a one-time
+# login (approving 2FA once) is reused by later headless refreshes.
+SESSION_TITLE = "riskmon"
 
 
 class FidelityApiUnavailable(Exception):
@@ -88,21 +94,21 @@ def sync_via_api() -> dict:
 
     browser = None
     try:
-        browser = fidelity_lib.FidelityAutomation(headless=True, save_state=True)
-        _step_1, step_2 = browser.login(username=username, password=password, save_device=True)
+        browser = fidelity_lib.FidelityAutomation(
+            headless=True, save_state=True,
+            profile_path=str(DATA_DIR), title=SESSION_TITLE,
+        )
+        _step_1, step_2 = browser.login(
+            username=username, password=password,
+            totp_secret=(totp_secret or None), save_device=True,
+        )
         if not step_2:
-            # 2FA needed. Can only proceed unattended if we have a TOTP secret.
-            if not totp_secret:
-                raise FidelityApiUnavailable(
-                    "Fidelity requires 2FA and no TOTP secret is configured"
-                )
-            try:
-                import pyotp
-                code = pyotp.TOTP(totp_secret).now()
-            except Exception as exc:
-                raise FidelityApiUnavailable(f"could not generate a 2FA code ({exc})") from exc
-            if browser.login_2FA(code) is False:
-                raise FidelityApiUnavailable("Fidelity rejected the 2FA code")
+            # Headless can't clear an interactive 2FA challenge (e.g. Duo push).
+            # The saved session has expired or there's no usable TOTP secret.
+            raise FidelityApiUnavailable(
+                "Fidelity needs a fresh login/2FA — run `python fidelity_login.py` "
+                "to re-establish the saved session (or add a TOTP secret)"
+            )
         account_info = browser.getAccountInfo()
     except FidelityApiUnavailable:
         raise

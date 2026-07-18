@@ -26,6 +26,10 @@
   <button type="submit">Save Fidelity login</button>
 </form>
 
+<p class="hint" style="margin-top:12px"><strong>Using Duo push, or no TOTP secret?</strong> Leave the TOTP box blank, save your username/password above, then run the <strong>one-time interactive login</strong> from the project root. It opens a browser so you approve 2FA once, then saves the session so later (headless) refreshes skip 2FA:</p>
+<pre class="cmd"><code>.venv\Scripts\python.exe fidelity_login.py</code></pre>
+<p class="hint">Re-run it whenever refreshes start falling back to CSV — that means the saved Fidelity session expired.</p>
+
 <h4 style="margin-top:20px">CSV fallback</h4>
 <p>Export your positions from fidelity.com (<em>Positions → Download</em>) and drop the CSV into <code>data/</code> — any filename starting with <code>Fidelity_</code>. Refresh uses it whenever the automated login isn't available.</p>
 {% if fidelity_csv %}
