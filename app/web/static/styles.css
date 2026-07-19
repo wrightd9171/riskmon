@@ -140,8 +140,11 @@ table.positions th a:hover { text-decoration: underline; }
 .trend-svg .zero { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 3 3; }
 .trend-svg .axis-label { fill: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }
 .trend-svg .crosshair { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 3 3; }
-.trend-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.leg-item { font-size: 13px; color: #475569; display: inline-flex; align-items: center; }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px;
+                padding-top: 10px; border-top: 1px solid #f1f5f9; }
+.leg-line { display: inline-block; width: 18px; height: 3px; border-radius: 2px;
+            margin-right: 6px; vertical-align: middle; }
+.leg-item { font-size: 13px; color: #334155; display: inline-flex; align-items: center; }
 .leg-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
               margin-right: 6px; vertical-align: middle; }
 .trend-tip { position: absolute; pointer-events: none; background: #0f172a; color: #e2e8f0;

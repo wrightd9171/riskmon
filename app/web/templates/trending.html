@@ -137,6 +137,15 @@
     });
     mount.appendChild(svg);
 
+    var legend = document.createElement("div");
+    legend.className = "trend-legend";
+    chosen.forEach(function (s) {
+      var it = document.createElement("span"); it.className = "leg-item";
+      it.innerHTML = '<span class="leg-line" style="background:' + s.color + '"></span>' + esc(s.label);
+      legend.appendChild(it);
+    });
+    mount.appendChild(legend);
+
     var cross = el("line", { "class": "crosshair" }); cross.style.display = "none"; svg.appendChild(cross);
     var markers = [], tip = document.createElement("div");
     tip.className = "trend-tip"; tip.style.display = "none"; mount.appendChild(tip);
