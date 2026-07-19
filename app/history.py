@@ -2,16 +2,22 @@
 
 record_snapshot() upserts today's per-position rows from the current positions
 (called after each refresh and by the digest). trend_data() reshapes the stored
-history into date-aligned line series for a given breakdown.
+history into date-aligned line series carrying both metrics; the UI picks the
+metric and toggles which series show.
 """
 import datetime as dt
-from collections import defaultdict
 
 from sqlalchemy import select
 
 from .db import Account, Position, PositionSnapshot, SessionLocal
 
-TOP_SYMBOLS = 8  # symbol breakdown shows the top N by latest value, rest -> "Other"
+TOP_SYMBOLS = 8  # symbol series show the top N by latest value, rest -> "Other"
+
+BROKER_LABEL = {
+    "schwab": "Schwab", "coinbase": "Coinbase", "robinhood": "Robinhood",
+    "strike": "Strike", "fidelity": "Fidelity", "onchain": "On-chain",
+}
+BROKER_ORDER = ["schwab", "coinbase", "robinhood", "strike", "fidelity", "onchain"]
 
 
 def _account_label(a: Account) -> str:
@@ -53,79 +59,78 @@ def record_snapshot() -> None:
         session.commit()
 
 
-def _key_for(row: PositionSnapshot, breakdown: str) -> str:
-    if breakdown == "account":
-        return row.account_label or (row.broker or "?").title()
-    if breakdown == "symbol":
-        return row.symbol
-    return "Total"
-
-
-def trend_data(breakdown: str = "overall") -> dict:
-    """Return {dates, mv_series, pnl_series} for the given breakdown.
-
-    Each series is {label, values}, values aligned to `dates` (null = no data /
-    undefined P&L that day). market value sums every position; P&L sums only
-    positions that have a cost basis (null when a group has none that day)."""
-    if breakdown not in ("overall", "account", "symbol"):
-        breakdown = "overall"
-
+def trend_data() -> dict:
+    """Return {dates, series} where each series carries BOTH metrics:
+    {id, label, group, mv:[...], pnl:[...]} aligned to `dates` (null = no data /
+    undefined P&L). Series: Total (portfolio), one per broker (accounts), and the
+    top symbols + Other."""
     with SessionLocal() as session:
         rows = session.execute(
             select(PositionSnapshot).order_by(PositionSnapshot.snapshot_date)
         ).scalars().all()
 
     dates = sorted({r.snapshot_date for r in rows})
-    # key -> date -> accumulators
-    mv = defaultdict(lambda: defaultdict(float))
-    pnl = defaultdict(lambda: defaultdict(float))
-    pnl_has = defaultdict(lambda: defaultdict(bool))
+    n = len(dates)
+    di = {d: i for i, d in enumerate(dates)}
+
+    def new_acc():
+        return {"mv": [0.0] * n, "mv_seen": [False] * n,
+                "pnl": [0.0] * n, "pnl_seen": [False] * n}
+
+    total = new_acc()
+    brokers: dict[str, dict] = {}
+    symbols: dict[str, dict] = {}
+
     for r in rows:
-        key = _key_for(r, breakdown)
-        d = r.snapshot_date
-        if r.market_value is not None:
-            mv[key][d] += r.market_value
-        if r.cost_basis_value is not None and r.market_value is not None:
-            pnl[key][d] += r.market_value - r.cost_basis_value
-            pnl_has[key][d] = True
+        i = di[r.snapshot_date]
+        mv = r.market_value
+        for acc in (total,
+                    brokers.setdefault(r.broker or "?", new_acc()),
+                    symbols.setdefault(r.symbol, new_acc())):
+            if mv is not None:
+                acc["mv"][i] += mv
+                acc["mv_seen"][i] = True
+            if mv is not None and r.cost_basis_value is not None:
+                acc["pnl"][i] += mv - r.cost_basis_value
+                acc["pnl_seen"][i] = True
 
-    keys = list(mv.keys())
-    # For symbol breakdown, keep the top N by latest market value; fold rest.
-    if breakdown == "symbol" and len(keys) > TOP_SYMBOLS and dates:
-        last = dates[-1]
-        keys.sort(key=lambda k: mv[k].get(last, 0.0), reverse=True)
-        top, rest = keys[:TOP_SYMBOLS], keys[TOP_SYMBOLS:]
-        for k in rest:
-            for d, v in mv[k].items():
-                mv["Other"][d] += v
-            for d, v in pnl[k].items():
-                pnl["Other"][d] += v
-                pnl_has["Other"][d] = True
-            del mv[k]
-            del pnl[k]
-        keys = top + (["Other"] if rest else [])
+    def add_into(src, dst):
+        for i in range(n):
+            if src["mv_seen"][i]:
+                dst["mv"][i] += src["mv"][i]
+                dst["mv_seen"][i] = True
+            if src["pnl_seen"][i]:
+                dst["pnl"][i] += src["pnl"][i]
+                dst["pnl_seen"][i] = True
 
-    def mv_series():
-        out = []
-        for k in keys:
-            byd = mv[k]
-            out.append({"label": k, "values": [byd.get(d) for d in dates]})
-        return out
+    def finalize(acc, sid, label, group):
+        return {
+            "id": sid, "label": label, "group": group,
+            "mv": [acc["mv"][i] if acc["mv_seen"][i] else None for i in range(n)],
+            "pnl": [acc["pnl"][i] if acc["pnl_seen"][i] else None for i in range(n)],
+        }
 
-    def pnl_series():
-        out = []
-        for k in keys:
-            byd, hasd = pnl[k], pnl_has[k]
-            out.append({
-                "label": k,
-                "values": [(byd.get(d) if hasd.get(d) else None) for d in dates],
-            })
-        # drop series that are entirely null (no cost basis anywhere)
-        return [s for s in out if any(v is not None for v in s["values"])]
+    series = [finalize(total, "total", "Total portfolio", "portfolio")]
 
-    return {
-        "dates": [d.isoformat() for d in dates],
-        "mv_series": mv_series(),
-        "pnl_series": pnl_series(),
-        "breakdown": breakdown,
-    }
+    ordered = [b for b in BROKER_ORDER if b in brokers]
+    ordered += [b for b in brokers if b not in BROKER_ORDER]
+    for b in ordered:
+        series.append(finalize(brokers[b], "broker:" + b, BROKER_LABEL.get(b, b.title()), "account"))
+
+    if symbols:
+        last = n - 1
+        sym_keys = sorted(
+            symbols,
+            key=lambda s: (symbols[s]["mv"][last] if n and symbols[s]["mv_seen"][last] else 0.0),
+            reverse=True,
+        )
+        for s in sym_keys[:TOP_SYMBOLS]:
+            series.append(finalize(symbols[s], "sym:" + s, s, "symbol"))
+        rest = sym_keys[TOP_SYMBOLS:]
+        if rest:
+            other = new_acc()
+            for s in rest:
+                add_into(symbols[s], other)
+            series.append(finalize(other, "sym:__other", "Other symbols", "symbol"))
+
+    return {"dates": [d.isoformat() for d in dates], "series": series}

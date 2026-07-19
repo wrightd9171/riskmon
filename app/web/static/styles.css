@@ -119,11 +119,20 @@ table.positions th a:hover { text-decoration: underline; }
                color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; }
 .button-link:hover { background: #1d4ed8; }
 
-.trend-controls { display: flex; gap: 4px; margin: 0 0 20px; }
-.trend-controls a { padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px;
-                    text-decoration: none; color: #475569; background: #f8fafc; font-size: 14px; }
-.trend-controls a:hover { background: #f1f5f9; }
-.trend-controls a.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+.trend-toolbar { margin: 0 0 14px; }
+.metric-toggle { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
+.metric-toggle button { padding: 6px 14px; border: none; background: #f8fafc; color: #475569;
+                        font-size: 14px; cursor: pointer; border-right: 1px solid #cbd5e1; }
+.metric-toggle button:last-child { border-right: none; }
+.metric-toggle button:hover { background: #f1f5f9; }
+.metric-toggle button.active { background: #2563eb; color: #fff; }
+.trend-series { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0 0 18px; }
+.series-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.series-group-name { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+                     color: #94a3b8; }
+.series-opt { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: #334155;
+              cursor: pointer; white-space: nowrap; }
+.series-opt input { margin: 0; }
 .trend-panel { position: relative; margin-bottom: 30px; max-width: 860px; }
 .trend-panel h3 { margin: 0 0 8px; font-size: 15px; }
 .trend-svg { width: 100%; height: auto; display: block; }
