@@ -81,6 +81,20 @@ class DailySnapshot(Base):
     created_at = Column(DateTime)
 
 
+class PositionSnapshot(Base):
+    """One row per (date, account, symbol): the market value and cost basis
+    captured that day, so the Trending view can chart value/P&L over time
+    overall, by account, or by symbol."""
+    __tablename__ = "position_snapshots"
+    id = Column(Integer, primary_key=True)
+    snapshot_date = Column(Date, nullable=False, index=True)
+    broker = Column(String)
+    account_label = Column(String)
+    symbol = Column(String, nullable=False)
+    market_value = Column(Float)
+    cost_basis_value = Column(Float)
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)
     # Lightweight migration: add columns introduced after the DB was created.

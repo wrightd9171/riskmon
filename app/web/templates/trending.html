@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Trending · Risk Monitor{% endblock %}
+{% block content %}
+<h2>Trending</h2>
+
+<nav class="trend-controls" aria-label="Breakdown">
+  {% for key, label in [('overall','Overall'), ('account','By account'), ('symbol','By symbol')] %}
+  <a href="/trending?breakdown={{ key }}"{% if breakdown == key %} class="active"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+
+<section class="trend-panel">
+  <h3>Total market value</h3>
+  <div id="chart-mv"></div>
+</section>
+
+<section class="trend-panel">
+  <h3>Unrealized P&amp;L</h3>
+  <div id="chart-pnl"></div>
+</section>
+
+<p class="hint">One point is recorded per day on each Refresh (and on the digest). History isn't retroactive — trends fill in as days accumulate.</p>
+
+<script>
+(function () {
+  var DATA = {{ data | tojson }};
+  var PALETTE = ["#2a78d6","#1baf7a","#eda100","#008300","#4a3aa7","#e34948","#e87ba4","#eb6834"];
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  // Color follows the entity: fix each label's hue from the market-value series.
+  var colorMap = {};
+  DATA.mv_series.forEach(function (s, i) { colorMap[s.label] = PALETTE[i % PALETTE.length]; });
+  function colorFor(label) { return colorMap[label] || PALETTE[0]; }
+
+  function fmtFull(v) {
+    var s = v < 0 ? "-" : "";
+    return s + "$" + Math.round(Math.abs(v)).toLocaleString();
+  }
+  function fmtAxis(v) {
+    var s = v < 0 ? "-" : "", a = Math.abs(v);
+    if (a >= 1e6) return s + "$" + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+    if (a >= 1e3) return s + "$" + Math.round(a / 1e3) + "k";
+    return s + "$" + Math.round(a);
+  }
+  function shortDate(iso) {
+    var p = iso.split("-"), mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return mo[parseInt(p[1], 10) - 1] + " " + parseInt(p[2], 10);
+  }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+  function niceNum(x, round) {
+    var exp = Math.floor(Math.log10(x || 1)), f = x / Math.pow(10, exp), nf;
+    if (round) nf = f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10;
+    else nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+    return nf * Math.pow(10, exp);
+  }
+  function niceTicks(min, max, n) {
+    if (min === max) { min -= 1; max += 1; }
+    var step = niceNum((max - min) / (n - 1), true);
+    var lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, out = [];
+    for (var v = lo; v <= hi + step / 2; v += step) out.push(Math.round(v * 1e6) / 1e6);
+    return out;
+  }
+  function el(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function renderChart(mount, series, includeZero) {
+    mount.innerHTML = "";
+    var dates = DATA.dates;
+    if (!dates.length) {
+      mount.innerHTML = '<p class="hint">No data yet — the first point appears after your next Refresh.</p>';
+      return;
+    }
+    var vals = [];
+    series.forEach(function (s) { s.values.forEach(function (v) { if (v != null) vals.push(v); }); });
+    if (!vals.length) {
+      mount.innerHTML = '<p class="hint">No data for this metric yet (needs positions with cost basis for P&amp;L).</p>';
+      return;
+    }
+    var ymin = Math.min.apply(null, vals), ymax = Math.max.apply(null, vals);
+    if (includeZero) { ymin = Math.min(ymin, 0); ymax = Math.max(ymax, 0); }
+    var pad = (ymax - ymin || Math.abs(ymax) || 1) * 0.08;
+    var ticks = niceTicks(ymin - pad, ymax + pad, 5);
+    ymin = ticks[0]; ymax = ticks[ticks.length - 1];
+
+    var W = 820, H = 300, m = { t: 14, r: 16, b: 26, l: 66 };
+    var pw = W - m.l - m.r, ph = H - m.t - m.b;
+    function X(i) { return dates.length === 1 ? m.l + pw / 2 : m.l + (i / (dates.length - 1)) * pw; }
+    function Y(v) { return m.t + ph - ((v - ymin) / (ymax - ymin)) * ph; }
+
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, "class": "trend-svg" });
+    ticks.forEach(function (t) {
+      svg.appendChild(el("line", { x1: m.l, y1: Y(t), x2: m.l + pw, y2: Y(t), "class": "grid" }));
+      var tx = el("text", { x: m.l - 8, y: Y(t) + 4, "class": "axis-label", "text-anchor": "end" });
+      tx.textContent = fmtAxis(t); svg.appendChild(tx);
+    });
+    var xi = dates.length <= 6 ? dates.map(function (_, i) { return i; })
+                               : [0, Math.floor((dates.length - 1) / 2), dates.length - 1];
+    xi.forEach(function (i) {
+      var tx = el("text", { x: X(i), y: H - 7, "class": "axis-label", "text-anchor": "middle" });
+      tx.textContent = shortDate(dates[i]); svg.appendChild(tx);
+    });
+    if (includeZero && 0 >= ymin && 0 <= ymax) {
+      svg.appendChild(el("line", { x1: m.l, y1: Y(0), x2: m.l + pw, y2: Y(0), "class": "zero" }));
+    }
+    series.forEach(function (s) {
+      var color = colorFor(s.label), d = "", pen = false, pts = [];
+      s.values.forEach(function (v, i) {
+        if (v == null) { pen = false; return; }
+        d += (pen ? "L" : "M") + X(i) + " " + Y(v) + " "; pen = true; pts.push(i);
+      });
+      svg.appendChild(el("path", { d: d.trim(), fill: "none", stroke: color,
+        "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      if (pts.length === 1) {
+        svg.appendChild(el("circle", { cx: X(pts[0]), cy: Y(s.values[pts[0]]), r: 4, fill: color }));
+      }
+    });
+    mount.appendChild(svg);
+
+    if (series.length > 1) {
+      var leg = document.createElement("div"); leg.className = "trend-legend";
+      series.forEach(function (s) {
+        var it = document.createElement("span"); it.className = "leg-item";
+        it.innerHTML = '<span class="leg-swatch" style="background:' + colorFor(s.label) + '"></span>' + esc(s.label);
+        leg.appendChild(it);
+      });
+      mount.appendChild(leg);
+    }
+
+    // Hover crosshair + tooltip
+    var cross = el("line", { "class": "crosshair" }); cross.style.display = "none"; svg.appendChild(cross);
+    var markers = [];
+    var tip = document.createElement("div"); tip.className = "trend-tip"; tip.style.display = "none"; mount.appendChild(tip);
+    var overlay = el("rect", { x: m.l, y: m.t, width: pw, height: ph, fill: "transparent" }); svg.appendChild(overlay);
+    overlay.addEventListener("mousemove", function (e) {
+      var r = svg.getBoundingClientRect();
+      var vx = (e.clientX - r.left) / r.width * W;
+      var idx = dates.length === 1 ? 0 : Math.round((vx - m.l) / pw * (dates.length - 1));
+      idx = Math.max(0, Math.min(dates.length - 1, idx));
+      var cx = X(idx);
+      cross.setAttribute("x1", cx); cross.setAttribute("x2", cx);
+      cross.setAttribute("y1", m.t); cross.setAttribute("y2", m.t + ph); cross.style.display = "";
+      markers.forEach(function (k) { k.remove(); }); markers.length = 0;
+      var rows = "";
+      series.forEach(function (s) {
+        var v = s.values[idx]; if (v == null) return;
+        var color = colorFor(s.label);
+        var mk = el("circle", { cx: cx, cy: Y(v), r: 4, fill: color, stroke: "#fff", "stroke-width": 1.5 });
+        svg.appendChild(mk); markers.push(mk);
+        rows += '<div class="tip-row"><span class="leg-swatch" style="background:' + color + '"></span>'
+              + (series.length > 1 ? esc(s.label) + ": " : "") + fmtFull(v) + "</div>";
+      });
+      tip.innerHTML = '<div class="tip-date">' + shortDate(dates[idx]) + "</div>" + rows;
+      tip.style.display = "";
+      var cr = mount.getBoundingClientRect();
+      var tx = e.clientX - cr.left + 14, ty = e.clientY - cr.top + 8;
+      if (tx + tip.offsetWidth > cr.width) tx = e.clientX - cr.left - tip.offsetWidth - 14;
+      tip.style.left = tx + "px"; tip.style.top = ty + "px";
+    });
+    overlay.addEventListener("mouseleave", function () {
+      cross.style.display = "none"; tip.style.display = "none";
+      markers.forEach(function (k) { k.remove(); }); markers.length = 0;
+    });
+  }
+
+  renderChart(document.getElementById("chart-mv"), DATA.mv_series, false);
+  renderChart(document.getElementById("chart-pnl"), DATA.pnl_series, true);
+})();
+</script>
+{% endblock %}

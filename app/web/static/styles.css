@@ -118,6 +118,29 @@ table.positions th a:hover { text-decoration: underline; }
 .button-link { display: inline-block; margin-top: 6px; padding: 8px 16px; background: #2563eb;
                color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; }
 .button-link:hover { background: #1d4ed8; }
+
+.trend-controls { display: flex; gap: 4px; margin: 0 0 20px; }
+.trend-controls a { padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px;
+                    text-decoration: none; color: #475569; background: #f8fafc; font-size: 14px; }
+.trend-controls a:hover { background: #f1f5f9; }
+.trend-controls a.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+.trend-panel { position: relative; margin-bottom: 30px; max-width: 860px; }
+.trend-panel h3 { margin: 0 0 8px; font-size: 15px; }
+.trend-svg { width: 100%; height: auto; display: block; }
+.trend-svg .grid { stroke: #eef2f7; stroke-width: 1; }
+.trend-svg .zero { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-svg .axis-label { fill: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }
+.trend-svg .crosshair { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.leg-item { font-size: 13px; color: #475569; display: inline-flex; align-items: center; }
+.leg-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+              margin-right: 6px; vertical-align: middle; }
+.trend-tip { position: absolute; pointer-events: none; background: #0f172a; color: #e2e8f0;
+             padding: 6px 9px; border-radius: 6px; font-size: 12px; white-space: nowrap;
+             box-shadow: 0 4px 14px rgba(0,0,0,0.18); z-index: 5; }
+.trend-tip .tip-date { font-weight: 600; margin-bottom: 3px; }
+.trend-tip .tip-row { line-height: 1.55; }
+.trend-tip .leg-swatch { width: 8px; height: 8px; }
 pre.cmd { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 6px;
           overflow-x: auto; font-size: 13px; margin: 8px 0; }
 pre.cmd code { color: inherit; }

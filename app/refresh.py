@@ -150,6 +150,11 @@ def _job() -> None:
         _set_source(key, state="running")
         state, detail = _run_one(key)
         _set_source(key, state=state, detail=detail)
+    try:  # record today's history point for the Trending view
+        from .history import record_snapshot
+        record_snapshot()
+    except Exception:
+        pass
     with _lock:
         _state["running"] = False
         _state["done_at"] = dt.datetime.utcnow().isoformat()

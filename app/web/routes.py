@@ -636,6 +636,27 @@ def refresh_status():
     return JSONResponse(refresh_get_status())
 
 
+@router.get("/trending", response_class=HTMLResponse)
+def trending_get(request: Request, breakdown: str = Query(default="overall")):
+    gate = _gate(request)
+    if gate:
+        return gate
+    from ..history import trend_data
+    data = trend_data(breakdown)
+    return TEMPLATES.TemplateResponse(request, "trending.html", {
+        "data": data,
+        "breakdown": data["breakdown"],
+    })
+
+
+@router.get("/trending/data")
+def trending_data(breakdown: str = Query(default="overall")):
+    if not store.is_unlocked():
+        return JSONResponse({"dates": [], "mv_series": [], "pnl_series": [], "breakdown": breakdown})
+    from ..history import trend_data
+    return JSONResponse(trend_data(breakdown))
+
+
 @router.get("/coinbase", response_class=HTMLResponse)
 def coinbase_get(request: Request):
     gate = _gate(request)

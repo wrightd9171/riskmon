@@ -50,6 +50,11 @@ def send_digest_now(refresh: bool = True) -> list[str]:
         url_title="Open dashboard",
     )
     record_daily_snapshot()
+    try:  # per-position history for the Trending view
+        from .history import record_snapshot
+        record_snapshot()
+    except Exception:
+        pass
     store.update(notify_last_sent=dt.datetime.utcnow().isoformat())
     return warnings
 
