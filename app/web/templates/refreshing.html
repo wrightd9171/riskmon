@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Refreshing · Risk Monitor{% endblock %}
+{% block content %}
+<h2>Refreshing…</h2>
+<p class="hint" id="refresh-note">Syncing each connected source. This can take a bit — especially Fidelity's browser login.</p>
+
+<ul class="refresh-list" id="refresh-list">
+  {% for s in status.sources %}
+  <li data-key="{{ s.key }}" class="state-{{ s.state }}">
+    <span class="rf-icon">•</span>
+    <span class="rf-label">{{ s.label }}</span>
+    <span class="rf-detail hint"></span>
+  </li>
+  {% else %}
+  <li class="hint">Nothing to refresh yet.</li>
+  {% endfor %}
+</ul>
+
+<div id="refresh-actions" hidden>
+  <a href="/main" class="button-link">View positions</a>
+</div>
+
+<script>
+(function () {
+  var ICON = { pending: "•", running: "⏳", ok: "✓", error: "✗", reconnect: "⚠" };
+  function render(d) {
+    (d.sources || []).forEach(function (s) {
+      var li = document.querySelector('#refresh-list li[data-key="' + s.key + '"]');
+      if (!li) return;
+      li.className = "state-" + s.state;
+      li.querySelector(".rf-icon").textContent = ICON[s.state] || "•";
+      var det = li.querySelector(".rf-detail");
+      if (s.state === "reconnect") {
+        det.innerHTML = "— " + (s.detail || "reconnect needed") +
+          ' <a href="/settings?tab=schwab">Reconnect</a>';
+      } else {
+        det.textContent = s.detail ? ("— " + s.detail) : "";
+      }
+    });
+  }
+  function finish(d) {
+    document.getElementById("refresh-actions").hidden = false;
+    var note = document.getElementById("refresh-note");
+    var problems = (d.sources || []).some(function (s) {
+      return s.state === "error" || s.state === "reconnect";
+    });
+    if (problems) {
+      note.textContent = "Refresh finished with some issues (see above).";
+    } else {
+      note.textContent = "Done. Taking you to your positions…";
+      setTimeout(function () { window.location = "/main"; }, 1200);
+    }
+  }
+  function poll() {
+    fetch("/refresh/status", { headers: { "Accept": "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        render(d);
+        if (d.running) { setTimeout(poll, 900); }
+        else { finish(d); }
+      })
+      .catch(function () { setTimeout(poll, 1500); });
+  }
+  poll();
+})();
+</script>
+{% endblock %}

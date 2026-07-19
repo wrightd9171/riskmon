@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
@@ -27,6 +27,7 @@ from ..schwab.sync import sync_all as schwab_sync_all
 from ..strike.client import StrikeAuthError
 from ..strike.sync import sync_all as strike_sync_all
 from ..secrets_store import store
+from ..refresh import get_status as refresh_get_status, start_refresh
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -614,63 +615,25 @@ def main_view(
 def refresh_post():
     if not store.is_unlocked():
         return RedirectResponse("/unlock", status_code=303)
-
-    errors: list[str] = []
-
-    if store.get("refresh_token"):
-        try:
-            schwab_sync_all()
-        except TokenError:
-            return RedirectResponse("/connect", status_code=303)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (401, 403):
-                return RedirectResponse("/connect", status_code=303)
-            errors.append(f"Schwab sync failed: {exc}")
-
-    if store.get("coinbase_key_name"):
-        try:
-            coinbase_sync_all()
-        except CoinbaseAuthError as exc:
-            errors.append(f"Coinbase auth failed: {exc}")
-        except httpx.HTTPStatusError as exc:
-            errors.append(f"Coinbase sync failed: {exc}")
-
-    if store.get("robinhood_api_key"):
-        try:
-            robinhood_sync_all()
-        except RobinhoodAuthError as exc:
-            errors.append(f"Robinhood auth failed: {exc}")
-        except httpx.HTTPStatusError as exc:
-            errors.append(f"Robinhood sync failed: {exc}")
-
-    if store.get("strike_api_key"):
-        try:
-            strike_sync_all()
-        except StrikeAuthError as exc:
-            errors.append(f"Strike auth failed: {exc}")
-        except httpx.HTTPStatusError as exc:
-            errors.append(f"Strike sync failed: {exc}")
-
-    if fidelity_sync.available():
-        try:
-            fidelity_sync.sync_all()
-        except Exception as exc:
-            errors.append(f"Fidelity sync failed: {exc}")
-
-    if onchain_sync.has_addresses():
-        try:
-            result = onchain_sync.sync_all()
-            for e in result.get("errors") or []:
-                errors.append(f"On-chain: {e}")
-        except Exception as exc:
-            errors.append(f"On-chain sync failed: {exc}")
-
     if not _any_broker_configured():
-        return RedirectResponse("/connect", status_code=303)
+        return RedirectResponse("/settings", status_code=303)
+    start_refresh()  # no-op if a refresh is already running
+    return RedirectResponse("/refreshing", status_code=303)
 
-    if errors:
-        raise HTTPException(status_code=502, detail=" | ".join(errors))
-    return RedirectResponse("/main", status_code=303)
+
+@router.get("/refreshing", response_class=HTMLResponse)
+def refreshing_get(request: Request):
+    gate = _gate(request)
+    if gate:
+        return gate
+    return TEMPLATES.TemplateResponse(request, "refreshing.html", {"status": refresh_get_status()})
+
+
+@router.get("/refresh/status")
+def refresh_status():
+    if not store.is_unlocked():
+        return JSONResponse({"running": False, "sources": [], "locked": True})
+    return JSONResponse(refresh_get_status())
 
 
 @router.get("/coinbase", response_class=HTMLResponse)

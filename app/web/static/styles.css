@@ -106,6 +106,18 @@ table.positions th a:hover { text-decoration: underline; }
 .settings-tabs a { cursor: pointer; }
 .settings-panel[hidden] { display: none; }
 .settings-panels { padding-top: 4px; }
+
+.refresh-list { list-style: none; padding: 0; margin: 14px 0; max-width: 520px; }
+.refresh-list li { padding: 7px 0; font-size: 15px; border-bottom: 1px solid #f1f5f9; }
+.refresh-list .rf-icon { display: inline-block; width: 1.6em; text-align: center; color: #94a3b8; }
+.refresh-list .rf-label { font-weight: 600; }
+.refresh-list li.state-running .rf-icon { color: #2563eb; }
+.refresh-list li.state-ok .rf-icon { color: #16a34a; }
+.refresh-list li.state-error .rf-icon,
+.refresh-list li.state-reconnect .rf-icon { color: #b91c1c; }
+.button-link { display: inline-block; margin-top: 6px; padding: 8px 16px; background: #2563eb;
+               color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; }
+.button-link:hover { background: #1d4ed8; }
 pre.cmd { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 6px;
           overflow-x: auto; font-size: 13px; margin: 8px 0; }
 pre.cmd code { color: inherit; }
